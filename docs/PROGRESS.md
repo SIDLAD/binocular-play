@@ -6,21 +6,18 @@ Every session: read this first, and update it before finishing. See `docs/PROMPT
 | Milestone | State |
 |---|---|
 | 0 Plan | **done**, approved by the user 2026-11-11 (`docs/PLAN.md`) |
-| 1 Foundation (settings, colours, onboarding, evidence pages) | not started |
+| 1 Foundation (settings, colours, onboarding, evidence pages) | **done** 2026-11-11 |
 | 2 First game (falling blocks) | not started |
 | 3 Four more games | not started |
 | 4 Progress & polish (dashboard, PWA) | not started |
 | 5 Ship (CI, GitHub Pages, README) | not started |
 
 ## Next step
-Build Milestones 1 and 2 without stopping between them. No code exists yet.
+Build Milestone 2 (falling blocks, "Tumble Stack") per `docs/PLAN.md` §6, §9 step 3 and §11 "Falling blocks".
 
-1. Read `CLAUDE.md`, `docs/PLAN.md` (all of it, including §11 "Implementation notes") and `docs/USER-FEEDBACK.md`. The plan is approved: do not re-plan or ask for approval again.
-2. Scaffold: `package.json` (scripts `dev`, `build`, `test`, `lint`, `check-links`), `tsconfig.json`, `vite.config.ts` (`base: './'`, Vitest config), `eslint.config.js`, MIT `LICENSE` (holder: "Binocular Play contributors", 2026), `.claude/launch.json` for the preview pane. Then `npm install -D vite typescript vitest jsdom eslint @eslint/js typescript-eslint`. No runtime dependencies.
-3. Milestone 1 in the order of `docs/PLAN.md` §9, with the five rule tests in `tests/rules/` written first.
-4. Verify as in `docs/PLAN.md` §10, update this file and the Commands section of `CLAUDE.md`, commit.
-5. Milestone 2 the same way, then commit again.
-6. Finish with: what was built, what was and was not verified, and a short real-glasses checklist.
+1. `src/games/falling-blocks/logic.ts` (pure) + `logic.test.ts`, then `game.ts` and `index.ts`; add it to `src/games/registry.ts`. The rule 3 and flash tests iterate the registry, so they cover it at once. Rule 3 expects every game to draw something at full intensity in both eye channels.
+2. `src/engine/loop.ts`, `input.ts`, `shell.ts`; replace the stub in `src/app/screens/play.ts` with the real play screen (start card, HUD, pause menu with "Adjust colours" sheet and the stop button, touch buttons, break overlay, session logging). `play.ts` must keep deciding with `canStartGame()` only and must not read the safety fields itself (a rule 5 test checks this).
+3. Verify as in `docs/PLAN.md` §10, update this file, commit.
 
 Rules from the user for this step: do not push and do not add a git remote; update and commit this file after every milestone.
 
@@ -38,7 +35,18 @@ Rules from the user for this step: do not push and do not add a git remote; upda
 - 2026-11-11: App chrome is neutral grey/white on dark; colour appears only through the channels. No UI framework, no runtime dependencies. (Fable 5.2)
 - 2026-11-11: Schema additions beyond the plan's §4: `AppData.deviceId`, `Calibration.needsCheck`, `GameDefinition.modes`, `GameContext.mode`. Details in `docs/PLAN.md` §11. (Fable 5.2)
 
+- 2026-11-11: Evidence page numbers were corrected against the PubMed abstracts, and differ from `docs/EVIDENCE.md`: CureSight is 149 children, non-inferior to patching (the "0.28 vs 0.23 logMAR" figures are not in the abstract and are not shown); PMC5145771 is the PEDIG trial in ages 5–12 (22 % did >75 % of play; patching did better); PMC6206863 is the teenager trial (13 %); PMC4549157 is a review, not the patching dose trial; PMC5984723 is a 21-child action-game pilot. The "88 % → 73 % real-world adherence" and "86 % compliance" claims had no source I could confirm, so they are not in the app. (Fable 5.2)
+- 2026-11-11: Onboarding has 8 numbered steps: disclaimer, who is playing, safety questions, glasses, lens side, weak eye, colour set-up, balance. The profile is created when the disclaimer is accepted. "Not sure" counts as "yes" for eye turn and double vision, and as "no" for clinician approval. (Fable 5.2)
+- 2026-11-11: The guided colour step lowers the brightness of the colour meant for the covered eye until the open eye cannot see it, never below 20 %. The hidden-number check also detects swapped lenses and offers to swap the setting. (Fable 5.2)
+- 2026-11-11: Routes that work before onboarding is finished: onboarding, evidence, treatments, players. Everything else redirects to onboarding. (Fable 5.2)
+- 2026-11-11: `Math.random` is banned under `src/games/` (games use the seeded `rng` from `GameContext`). Added to the rule 1 scanner. (Fable 5.2)
+
 ## Known issues / TODOs
+- Link check 2026-11-11 (`npm run check-links`): 23 of 25 load. Check by hand, they refuse scripts (HTTP 403): https://ouci.dntb.gov.ua/works/40NpAzy9 and https://core.ac.uk/download/481629086.pdf.
+- Evidence text for the AAO, Cochrane, ESCRS and Review of Optometry links repeats the summaries in `docs/EVIDENCE.md`; only the PubMed/PMC abstracts were read in full. Read those pages before Milestone 5.
+- The glasses drawing in onboarding shows the lens colours through the channels, which is only right on a dark background (onboarding always is).
+- The parent dashboard is a plain table for now; charts and the doctor summary are Milestone 4.
+- Auto-contrast and sound settings exist in the schema but have no UI yet (Milestones 3–4).
 - Check that every link in docs/EVIDENCE.md loads. The AAPOS, AAO, NEI and PubMed links were added from Gemini research and aren't checked yet.
 - The CureSight trial numbers in docs/EVIDENCE.md are not verified (sources disagree: 149 vs 103 children). Read the PubMed abstracts before writing the Evidence page.
 - Not yet tested with real anaglyph glasses.
@@ -46,9 +54,11 @@ Rules from the user for this step: do not push and do not add a git remote; upda
 - Night-light / True Tone / auto-brightness change colours after calibration. The calibration screen must say to turn them off.
 
 ## How to run
-Nothing to run yet: no `package.json`, nothing installed. Fill this in after scaffolding (commands, dev URL, where tests live).
-
-Environment checked on 2026-11-11: Node 26.7.0, npm 11.19.0, git 2.50.1 on Windows 11. Git identity is configured globally.
+- `npm install` once. Node 26, npm 11.
+- `npm run dev`: dev server at http://localhost:5173 (also `.claude/launch.json` → "binocular-play-dev" for the preview pane).
+- `npm test`: Vitest. Rule tests are in `tests/rules/` (one file per hard rule, plus `rule5-safety-dom` which runs the real app in jsdom), app tests in `tests/app/`, unit tests next to the code as `*.test.ts`.
+- `npm run lint`, `npm run build` (type-check + static build to `dist/`), `npm run check-links` (needs network).
+- To start from scratch in the browser: clear site data, or delete the `binocular-play` key in localStorage.
 
 ## Repo state
 - Git repo initialised on branch `main`. No remote. Nothing has been pushed.
@@ -58,3 +68,4 @@ Environment checked on 2026-11-11: Node 26.7.0, npm 11.19.0, git 2.50.1 on Windo
 - 2026-11-11, Opus 5.5: prior-art research, evidence gathering, wrote CLAUDE.md, PROMPT.md, RESEARCH.md, EVIDENCE.md, and this file. No code yet.
 - 2026-11-11, Opus 5.5: added the Gemini deep-research report (docs/research/) and distilled it into docs/USER-FEEDBACK.md. New MUSTs: double-vision safeguards, better calibration UX, adaptive difficulty, countdown and weekly goals, a low-effort mode, a "free forever" statement. Reading mode is a SHOULD.
 - 2026-11-11, Fable 5.2: read all docs, wrote the Milestone 0 plan (five hard rules, truth table, schema, `Game` interface, game designs, risks in CLAUDE.md), got it approved, saved it as docs/PLAN.md with implementation notes in §11, ran `git init`. The user moved the build to a fresh session to save tokens, so no code was written. Commit: "Add project docs and approved Milestone 0 plan".
+- 2026-11-11, Fable 5.2: Milestone 1. Scaffold, colour maths, channel renderer and recording context, settings store with export/import, safety guards, onboarding, guided colour set-up, Colours page, settings, players, grown-ups page, evidence pages. 249 tests pass; lint and build clean; walked in the browser at desktop, 375×812 and 812×375. Commit: "Milestone 1: foundation".

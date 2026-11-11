@@ -1,0 +1,23 @@
+/*
+ * App chrome is neutral grey on dark, on purpose. The player is wearing red/blue glasses:
+ * a coloured button would look different to each eye. Colour appears only inside canvases
+ * drawn through the weakEye / fellowEye / both channels.
+ */
+:root {
+  --bg: #101010;
+  --surface: #1c1c1c;
+  --surface-2: #272727;
+  --border: #3d3d3d;
+  --text: #ececec;
+  --muted: #a9a9a9;
+  --strong: #ffffff;
+  --on-strong: #101010;
+  --focus: #ffffff;
+
+  --radius: 14px;
+  --radius-small: 8px;
+  --gap: 16px;
+  --tap: 52px;
+  --page: 760px;
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}

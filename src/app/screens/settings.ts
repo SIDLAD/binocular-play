@@ -1,0 +1,245 @@
+import { lensOverEye } from '../../core/colour/mapping';
+import { GLASSES, PRESETS, type Glasses } from '../../core/colour/presets';
+import { MIN_CONTRAST, defaultCalibration, type Profile } from '../../core/settings/schema';
+import type { App } from '../app';
+import { confirmDialog, requireParent } from '../components/dialogs';
+import { page } from '../components/footer';
+import { button, clear, h, link, type Child } from '../dom';
+import type { Screen } from '../router';
+
+/** Content that a child profile can open only through the parent gate. */
+export function gated(app: App, title: string, back: string, build: () => Child[]): HTMLElement {
+  const holder = h('div', null);
+  const unlock = () => {
+    clear(holder);
+    for (const c of build()) {
+      if (c === null || c === undefined || c === false) continue;
+      holder.appendChild(typeof c === 'object' ? c : document.createTextNode(String(c)));
+    }
+  };
+  if (app.store.activeProfile?.kind === 'adult') unlock();
+  else {
+    holder.appendChild(
+      h(
+        'div',
+        { class: 'card' },
+        h('p', null, 'This page is for grown-ups.'),
+        button(
+          'I am a grown-up',
+          async () => {
+            if (await requireParent(app)) unlock();
+          },
+          'primary',
+          { 'data-testid': 'unlock' },
+        ),
+      ),
+    );
+  }
+  return page(title, [holder], { back });
+}
+
+export function setting(label: string, help: string | null, control: Child): HTMLElement {
+  return h('div', { class: 'setting' }, h('div', { class: 'label' }, label), help ? h('div', { class: 'help' }, help) : null, control);
+}
+
+function toggleGroup<T extends string>(label: string, options: { value: T; label: string }[], current: T, onPick: (v: T) => void): HTMLElement {
+  const group = h('div', { class: 'row', role: 'group', 'aria-label': label });
+  const buttons = options.map((o) =>
+    button(
+      o.label,
+      () => {
+        buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(options[i].value === o.value)));
+        onPick(o.value);
+      },
+      'plain',
+      { 'aria-pressed': String(o.value === current) },
+    ),
+  );
+  group.append(...buttons);
+  return group;
+}
+
+function select<T extends string>(label: string, options: { value: T; label: string }[], current: T, onPick: (v: T) => void): HTMLSelectElement {
+  const el = h('select', { 'aria-label': label }, ...options.map((o) => h('option', { value: o.value }, o.label)));
+  el.value = current;
+  el.addEventListener('change', () => onPick(el.value as T));
+  return el;
+}
+
+export const settingsScreen: Screen = (app) =>
+  gated(app, 'Settings', '/', () => {
+    const profile = app.store.activeProfile;
+    if (!profile) return [];
+    const summary = h('p', { class: 'muted', 'aria-live': 'polite' });
+    const describe = () => {
+      const p = app.store.activeProfile;
+      if (!p) return;
+      const lens = (eye: Profile['vision']['weakEye']) => (lensOverEye(p.vision, eye) === 'red' ? 'red' : PRESETS[p.vision.glasses].otherName);
+      const strong = p.vision.weakEye === 'left' ? 'right' : 'left';
+      summary.textContent = `Weaker eye: ${p.vision.weakEye}, behind the ${lens(p.vision.weakEye)} lens, sees the pieces you move. Stronger eye: ${strong}, behind the ${lens(strong)} lens, sees the rest.`;
+    };
+    describe();
+
+    const glasses = select<Glasses>(
+      'Glasses type',
+      GLASSES.map((g) => ({ value: g, label: PRESETS[g].label })),
+      profile.vision.glasses,
+      async (v) => {
+        const current = app.store.activeProfile?.vision.glasses;
+        if (v === current) return;
+        const ok = await confirmDialog(
+          app,
+          'Change glasses type?',
+          'The colours will go back to the starting values for the new glasses, so you will need to set them up again.',
+          'Change',
+        );
+        if (!ok) {
+          if (current) glasses.value = current;
+          return;
+        }
+        app.store.updateActive((p) => {
+          p.vision.glasses = v;
+          p.calibration = defaultCalibration(v);
+        });
+        describe();
+      },
+    );
+
+    const contrast = h('input', {
+      type: 'range',
+      min: String(MIN_CONTRAST * 100),
+      max: '100',
+      step: '1',
+      value: String(Math.round(profile.fellowContrast * 100)),
+      'aria-label': 'Strong-eye brightness',
+    });
+    const contrastOut = h('output', null, `${Math.round(profile.fellowContrast * 100)}%`);
+    contrast.addEventListener('input', () => {
+      app.store.updateActive((p) => {
+        p.fellowContrast = Number(contrast.value) / 100;
+      });
+      contrastOut.textContent = `${contrast.value}%`;
+    });
+
+    const breakTick = h('input', { type: 'checkbox', checked: profile.session.breakReminder });
+    breakTick.addEventListener('change', () =>
+      app.store.updateActive((p) => {
+        p.session.breakReminder = breakTick.checked;
+      }),
+    );
+
+    return [
+      h(
+        'div',
+        { class: 'card' },
+        h('h2', null, 'Glasses and eyes'),
+        setting('Glasses type', null, glasses),
+        setting(
+          'Red lens is on the',
+          null,
+          toggleGroup(
+            'Red lens side',
+            [
+              { value: 'left', label: 'Left eye' },
+              { value: 'right', label: 'Right eye' },
+            ],
+            profile.vision.redLensEye,
+            (v) => {
+              app.store.updateActive((p) => {
+                p.vision.redLensEye = v;
+              });
+              describe();
+            },
+          ),
+        ),
+        setting(
+          'The weaker eye is the',
+          'The eye your eye doctor is helping. If you are not sure, ask them.',
+          toggleGroup(
+            'Weaker eye',
+            [
+              { value: 'left', label: 'Left eye' },
+              { value: 'right', label: 'Right eye' },
+            ],
+            profile.vision.weakEye,
+            (v) => {
+              app.store.updateActive((p) => {
+                p.vision.weakEye = v;
+              });
+              describe();
+            },
+          ),
+        ),
+        summary,
+      ),
+      h(
+        'div',
+        { class: 'card' },
+        h('h2', null, 'Colours'),
+        setting(
+          'Strong-eye brightness',
+          'Dims only what the stronger eye sees. Follow your eye doctor if they gave you a number.',
+          h('div', { class: 'slider-row' }, contrast, contrastOut),
+        ),
+        h('p', null, link('Open the Colours page', '#/colours', 'btn btn-plain'), ' for the colour wheel, the guided set-up and the hidden-number check.'),
+      ),
+      h(
+        'div',
+        { class: 'card' },
+        h('h2', null, 'Play time'),
+        setting(
+          'Session length',
+          'When this much play time is used up, the game pauses and suggests a break. The app never decides how much you should play: ask your eye doctor.',
+          select(
+            'Session length',
+            [5, 10, 15, 20, 30, 45, 60].map((m) => ({ value: String(m), label: `${m} minutes` })),
+            String(profile.session.lengthMin),
+            (v) =>
+              app.store.updateActive((p) => {
+                p.session.lengthMin = Number(v);
+              }),
+          ),
+        ),
+        h('label', { class: 'check' }, breakTick, h('span', null, 'Show the break reminder')),
+      ),
+      h(
+        'div',
+        { class: 'card' },
+        h('h2', null, 'Comfort'),
+        setting(
+          'Motion',
+          'Reduced motion removes fades and sliding effects in games.',
+          select(
+            'Motion',
+            [
+              { value: 'system', label: 'Follow this device' },
+              { value: 'on', label: 'Reduced motion' },
+              { value: 'off', label: 'Full motion' },
+            ],
+            profile.ui.reducedMotion,
+            (v) =>
+              app.store.updateActive((p) => {
+                p.ui.reducedMotion = v;
+              }),
+          ),
+        ),
+        setting(
+          'Background (advanced)',
+          'Dark is the normal choice. On a light background the colours swap over: each eye sees the shapes drawn in the OTHER lens’s colour, as dark shapes on white. Only use it if your eye doctor asks for it, and check the colours again afterwards.',
+          toggleGroup(
+            'Background',
+            [
+              { value: 'dark', label: 'Dark' },
+              { value: 'light', label: 'Light' },
+            ],
+            profile.vision.background,
+            (v) =>
+              app.store.updateActive((p) => {
+                p.vision.background = v;
+              }),
+          ),
+        ),
+      ),
+      h('div', { class: 'row' }, link('Players', '#/profiles', 'btn btn-plain'), link('For grown-ups', '#/parent', 'btn btn-plain')),
+    ];
+  });
