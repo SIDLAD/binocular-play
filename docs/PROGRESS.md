@@ -7,17 +7,28 @@ Every session: read this first, and update it before finishing. See `docs/PROMPT
 |---|---|
 | 0 Plan | **done**, approved by the user 2026-11-11 (`docs/PLAN.md`) |
 | 1 Foundation (settings, colours, onboarding, evidence pages) | **done** 2026-11-11 |
-| 2 First game (falling blocks) | not started |
+| 2 First game (falling blocks) | **in progress**: rules, drawing and engine done; play screen not built |
 | 3 Four more games | not started |
 | 4 Progress & polish (dashboard, PWA) | not started |
 | 5 Ship (CI, GitHub Pages, README) | not started |
 
 ## Next step
-Build Milestone 2 (falling blocks, "Tumble Stack") per `docs/PLAN.md` §6, §9 step 3 and §11 "Falling blocks".
+Finish Milestone 2. The user paused the build here on 2026-11-11 and may continue with a different model.
 
-1. `src/games/falling-blocks/logic.ts` (pure) + `logic.test.ts`, then `game.ts` and `index.ts`; add it to `src/games/registry.ts`. The rule 3 and flash tests iterate the registry, so they cover it at once. Rule 3 expects every game to draw something at full intensity in both eye channels.
-2. `src/engine/loop.ts`, `input.ts`, `shell.ts`; replace the stub in `src/app/screens/play.ts` with the real play screen (start card, HUD, pause menu with "Adjust colours" sheet and the stop button, touch buttons, break overlay, session logging). `play.ts` must keep deciding with `canStartGame()` only and must not read the safety fields itself (a rule 5 test checks this).
-3. Verify as in `docs/PLAN.md` §10, update this file, commit.
+Done and committed for Milestone 2 (all tests pass, lint and build clean):
+- `src/games/falling-blocks/`: `logic.ts` (pure rules, 25 tests in `logic.test.ts`), `game.ts` (drawing, keyboard and touch gestures), `index.ts` (definition, modes `classic` and `easy`, tile icon). Registered in `src/games/registry.ts`, so the home tile, the rule 3 live-colour test and the 60-second flash test already cover it.
+- `src/engine/loop.ts` (fixed 60 Hz), `input.ts` (keyboard and pointer), `shell.ts` (`GameShell`: canvas sizing, loop, input, pause, restart, repaint on palette change while paused). None of these three has been run in a browser yet.
+
+Still to do:
+1. Replace the stub in `src/app/screens/play.ts` with the real play screen, as described in `docs/PLAN.md` §11 "Engine and tests": start card (title, `eyeRule`, `controls`, mode buttons) → `GameShell` on a full-height canvas → HUD as DOM text (score, level, countdown from `remainingMs`/`formatClock` in `core/safety/session.ts`) → pause (button, Escape/P, tab hidden) showing `pauseMenu()` from `app/components/safety.ts` → "Adjust colours" opens `colourEditor(app, scope, { sheet: true })` in a `.editor-sheet` with the paused game visible above it → on-screen buttons from `def.touchButtons` when `isTouchDevice()` → game-over card → break overlay (`breakOverlay()`; "5 more minutes" goes through `requireParent` then `app.session.extend`).
+   - Keep the guard as it is: `play.ts` decides with `canStartGame()` only and must not mention `disclaimerAcceptedAt`, `doubleVisionBlockedOn`, `checkPassedAt` or `completedAt` (a rule 5 test scans for them).
+   - Session logging: feed `onActiveTime` into `app.session.addPlay` (throttle the writes) and, when a round ends, store one record with `makeRecord` + `addSessionRecord` (`core/progress/sessionLog.ts`), `endedBy` = `gameOver | quit | timer | doubleVision`. Log an unfinished round as `quit` when the screen is disposed, once only.
+   - The stop button must log the round as `doubleVision` and then call `stopForDoubleVision(app, 'double-or-pain-in-game')`.
+   - Seed the game with `seededRng(...)`; `reducedMotion` from `prefersReducedMotion(profile.ui.reducedMotion)`; `startLevel` 1.
+   - Add CSS for the play layout to `src/app/styles/base.css` (neutral greys only; no looping animation under 1 s).
+2. Extend `tests/rules/rule5-safety-dom.test.ts`: on the real play screen, pausing shows the stop button, and pressing it logs the round and blocks play.
+3. Verify as in `docs/PLAN.md` §10: lint, tests, build; play a round in the browser with keyboard and at 375×812 and 812×375; read pixels from the game canvas and confirm they match the palette, then change a colour from the pause menu and confirm they change with no reload; check the console.
+4. Update this file, commit, and finish with: what was built, what was and was not verified, and a short real-glasses checklist.
 
 Rules from the user for this step: do not push and do not add a git remote; update and commit this file after every milestone.
 
@@ -41,7 +52,11 @@ Rules from the user for this step: do not push and do not add a git remote; upda
 - 2026-11-11: Routes that work before onboarding is finished: onboarding, evidence, treatments, players. Everything else redirects to onboarding. (Fable 5.2)
 - 2026-11-11: `Math.random` is banned under `src/games/` (games use the seeded `rng` from `GameContext`). Added to the rule 1 scanner. (Fable 5.2)
 
+- 2026-11-11: Rule 3's test expects every game to draw something at full intensity in both eye channels after a few seconds of play, so the live-colour check can find both colours. (Fable 5.2)
+- 2026-11-11: Tumble Stack touch controls: drag sideways moves one column per cell, a slow drag down lowers the piece without locking it, a tap turns, a fast flick down drops. Mode order is classic then easy. (Fable 5.2)
+
 ## Known issues / TODOs
+- `#/play/falling-blocks` still shows the Milestone 1 stub (title and blurb only) after the double-vision check: the game cannot be played in the app yet.
 - Link check 2026-11-11 (`npm run check-links`): 23 of 25 load. Check by hand, they refuse scripts (HTTP 403): https://ouci.dntb.gov.ua/works/40NpAzy9 and https://core.ac.uk/download/481629086.pdf.
 - Evidence text for the AAO, Cochrane, ESCRS and Review of Optometry links repeats the summaries in `docs/EVIDENCE.md`; only the PubMed/PMC abstracts were read in full. Read those pages before Milestone 5.
 - The glasses drawing in onboarding shows the lens colours through the channels, which is only right on a dark background (onboarding always is).
@@ -69,3 +84,4 @@ Rules from the user for this step: do not push and do not add a git remote; upda
 - 2026-11-11, Opus 5.5: added the Gemini deep-research report (docs/research/) and distilled it into docs/USER-FEEDBACK.md. New MUSTs: double-vision safeguards, better calibration UX, adaptive difficulty, countdown and weekly goals, a low-effort mode, a "free forever" statement. Reading mode is a SHOULD.
 - 2026-11-11, Fable 5.2: read all docs, wrote the Milestone 0 plan (five hard rules, truth table, schema, `Game` interface, game designs, risks in CLAUDE.md), got it approved, saved it as docs/PLAN.md with implementation notes in §11, ran `git init`. The user moved the build to a fresh session to save tokens, so no code was written. Commit: "Add project docs and approved Milestone 0 plan".
 - 2026-11-11, Fable 5.2: Milestone 1. Scaffold, colour maths, channel renderer and recording context, settings store with export/import, safety guards, onboarding, guided colour set-up, Colours page, settings, players, grown-ups page, evidence pages. 249 tests pass; lint and build clean; walked in the browser at desktop, 375×812 and 812×375. Commit: "Milestone 1: foundation".
+- 2026-11-11, Fable 5.2: started Milestone 2 and paused at the user's request. Tumble Stack rules, drawing and definition, plus the engine loop, input and shell, are in; the play screen is not. 274 tests pass; lint and build clean; the new engine files are untested in a browser. Commit: "Milestone 2 (part): Tumble Stack rules, drawing and engine shell".
