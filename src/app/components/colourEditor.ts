@@ -6,7 +6,8 @@ import { button, clear, h, type Scope } from '../dom';
 import { drawPreview } from './art';
 import { openCalibration, openEyeTest } from './calibration';
 import { channelCanvas } from './channelCanvas';
-import { colourControl } from './colourControl';
+import { colourControl, type EyeGuide } from './colourControl';
+import { colourSeenOnlyThrough, otherEye, otherKey, type ColourKey } from '../../core/colour/mapping';
 import { confirmDialog } from './dialogs';
 
 /**
@@ -38,33 +39,33 @@ export function colourEditor(app: App, scope: Scope, options: { sheet: boolean; 
           h('div', { class: 'notice' }, h('p', null, 'These colours came from another device. Check them on this screen: run the colour check below.')),
         );
       }
-      const issues = checkSeparation(p);
-      if (issues.length > 0) {
-        const names = { red: 'red', other: preset.otherName };
-        warnings.appendChild(
-          h(
-            'div',
-            { class: 'notice' },
-            ...issues.map((i) =>
-              h(
-                'p',
-                null,
-                i.kind === 'leak'
-                  ? `The ${names[i.colour]} colour now has some of the other lens's colour in it, so the other eye may see it too. That can be right for your glasses: run the colour check to find out.`
-                  : `The ${names[i.colour]} colour is now too dim for its own eye to see. Raise its brightness.`,
-              ),
-            ),
-          ),
-        );
-      }
     };
     renderWarnings();
     inner.onDispose(app.store.subscribe(renderWarnings));
 
+    const lensName = (k: ColourKey) => (k === 'red' ? 'red' : preset.otherName);
+    const guideFor = (key: ColourKey): EyeGuide => {
+      // The lens this colour must pass (on a light background it is the opposite lens).
+      const seesLens = colourSeenOnlyThrough(key, background);
+      const seesEye = seesLens === 'red' ? profile.vision.redLensEye : otherEye(profile.vision.redLensEye);
+      return {
+        sees: seesEye.toUpperCase(),
+        hidden: otherEye(seesEye).toUpperCase(),
+        seesLens: lensName(seesLens),
+        hiddenLens: lensName(otherKey(seesLens)),
+        seesIsWeak: seesEye === profile.vision.weakEye,
+      };
+    };
+    const issuesFor = (key: ColourKey) => {
+      const p = app.store.activeProfile;
+      return p ? checkSeparation(p).filter((i) => i.colour === key).map((i) => i.kind) : [];
+    };
+
     const red = colourControl({
       title: 'Red lens colour',
-      help: 'The colour that goes with the red lens.',
       background,
+      eyes: guideFor('red'),
+      issues: () => issuesFor('red'),
       get: () => app.store.activeProfile?.calibration.redLens ?? { base: preset.redLens, brightness: 1 },
       set: (c) =>
         app.store.updateActive((p) => {
@@ -73,8 +74,9 @@ export function colourEditor(app: App, scope: Scope, options: { sheet: boolean; 
     });
     const other = colourControl({
       title: `${preset.otherName[0].toUpperCase()}${preset.otherName.slice(1)} lens colour`,
-      help: `The colour that goes with the ${preset.otherName} lens.`,
       background,
+      eyes: guideFor('other'),
+      issues: () => issuesFor('other'),
       get: () => app.store.activeProfile?.calibration.otherLens ?? { base: preset.otherLens, brightness: 1 },
       set: (c) =>
         app.store.updateActive((p) => {
@@ -168,6 +170,14 @@ export function colourEditor(app: App, scope: Scope, options: { sheet: boolean; 
     }
     root.appendChild(warnings);
     if (options.sheet) root.appendChild(tools);
+    root.appendChild(
+      h(
+        'p',
+        { class: 'cover-intro' },
+        h('strong', null, 'Tune one colour at a time, with one eye covered.'),
+        ' Keep your glasses on and cover one eye with your hand (not the lens). Each colour card below tells you which eye to cover.',
+      ),
+    );
     root.appendChild(h('div', { class: 'colour-grid' }, red.el, other.el));
     root.appendChild(sliders);
     if (!options.sheet) root.appendChild(tools);

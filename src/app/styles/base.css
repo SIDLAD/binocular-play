@@ -238,6 +238,7 @@ label.check input {
   accent-color: #ffffff;
 }
 input[type='text'],
+input[type='number'],
 textarea,
 select {
   font: inherit;
@@ -536,6 +537,93 @@ canvas.preview {
   height: 56px;
   border-radius: var(--radius-small);
   margin-bottom: 8px;
+}
+.colour-control .eye-for {
+  margin: -4px 0 10px;
+}
+.colour-control .patch-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 96px;
+  border-radius: var(--radius-small);
+  border: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.colour-control .patch-colour {
+  width: 45%;
+  height: 56px;
+  border-radius: 8px;
+}
+.colour-control .cover-steps {
+  margin: 0 0 12px;
+  padding-left: 1.4em;
+}
+.colour-control .cover-steps li + li {
+  margin-top: 4px;
+}
+.colour-control .rgb-sliders {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.colour-control .rgb-row {
+  display: grid;
+  grid-template-columns: 3.4em 1fr 4.6em;
+  align-items: center;
+  gap: 10px;
+}
+.colour-control input.rgb-range {
+  width: 100%;
+  height: 22px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--track);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+}
+.colour-control input.rgb-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid #000000;
+  cursor: pointer;
+}
+.colour-control input.rgb-range::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid #000000;
+  cursor: pointer;
+}
+.colour-control input.rgb-num {
+  width: 100%;
+  padding: 6px 4px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.colour-control .colour-hint {
+  min-height: 3em;
+  margin: 10px 0 6px;
+  color: var(--muted, inherit);
+}
+.colour-control .colour-hint[data-state='warn'] {
+  color: var(--text);
+  font-weight: 600;
+}
+.colour-control details.more-colour summary {
+  cursor: pointer;
+  padding: 6px 0;
+}
+.colour-control details.more-colour .wheel-row {
+  margin-top: 8px;
+}
+.colour-editor .cover-intro {
+  margin: 0 0 var(--gap);
 }
 .colour-control input.hex {
   font-family: ui-monospace, Consolas, monospace;

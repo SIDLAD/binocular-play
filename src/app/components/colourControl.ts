@@ -1,4 +1,4 @@
-import { hsvToRgb, mixGamma, normaliseHex, parseHex, rgbToHsv, toHex, BLACK, WHITE } from '../../core/colour/srgb';
+import { hsvToRgb, mixGamma, normaliseHex, parseHex, rgbToHsv, toHex, BLACK, WHITE, type RGB } from '../../core/colour/srgb';
 import type { LensColour } from '../../core/settings/schema';
 import { button, h } from '../dom';
 import { get2d } from './channelCanvas';
@@ -10,6 +10,16 @@ const WHEEL_R = WHEEL_PX / 2 - RIM;
 /** The colour as it will be drawn: the base faded toward the background by its brightness. */
 export function drawnColour(c: LensColour, background: 'dark' | 'light'): string {
   return toHex(mixGamma(background === 'dark' ? BLACK : WHITE, parseHex(c.base), c.brightness));
+}
+
+/**
+ * The stored form of a colour that should be drawn exactly as `rgb`.
+ * Dark background: a full-value base plus a brightness, so the brightness slider keeps the mix.
+ */
+export function lensColourFromDrawn(rgb: RGB, background: 'dark' | 'light'): LensColour {
+  if (background === 'light') return { base: toHex(rgb), brightness: 1 };
+  const { h: hue, s, v } = rgbToHsv(rgb);
+  return { base: toHex(hsvToRgb(hue, s, 1)), brightness: v };
 }
 
 let wheelImage: ImageData | null = null;
@@ -46,31 +56,58 @@ export interface ColourControl {
   refresh(): void;
 }
 
+/** Which eye should see this colour and which should not, in words. */
+export interface EyeGuide {
+  /** "LEFT" / "RIGHT": the eye that should see this colour. */
+  sees: string;
+  /** "LEFT" / "RIGHT": the eye that should not see it. */
+  hidden: string;
+  /** The lens in front of each, e.g. "red" and "cyan". */
+  seesLens: string;
+  hiddenLens: string;
+  /** True when the eye that should see it is the weaker eye. */
+  seesIsWeak: boolean;
+}
+
+/** How long the colour must stay still before a separation hint is shown. */
+const HINT_DELAY_MS = 1200;
+
+const CHANNELS = [
+  { name: 'Red', track: '#ff0000' },
+  { name: 'Green', track: '#00ff00' },
+  { name: 'Blue', track: '#0000ff' },
+] as const;
+
 /**
- * One calibrated colour: a hue/saturation wheel, a brightness slider with ±1 steps,
- * and a hex field. One brightness step is one code value (1/255).
+ * One calibrated colour: a test patch on the real background with "cover one eye"
+ * steps, red/green/blue sliders, a brightness slider with ±1 steps, and (folded away)
+ * a hue/saturation wheel and a hex field. One step is one code value (1/255).
  */
 export function colourControl(options: {
   title: string;
-  help: string;
   background: 'dark' | 'light';
+  eyes: EyeGuide;
   get(): LensColour;
   set(c: LensColour): void;
+  /** Separation problems for this colour under the ideal lens model. */
+  issues(): ('leak' | 'invisible')[];
 }): ColourControl {
+  const { eyes } = options;
+  const bgHex = options.background === 'dark' ? '#000000' : '#ffffff';
+
   const wheel = h('canvas', {
     class: 'wheel',
     role: 'img',
-    'aria-label': `${options.title}: colour wheel. Use the hex field to type an exact colour.`,
+    'aria-label': `${options.title}: colour wheel. Use the sliders or the hex field to set an exact colour.`,
   });
   wheel.width = WHEEL_PX;
   wheel.height = WHEEL_PX;
   const ctx = get2d(wheel);
 
-  const swatch = h('div', { class: 'swatch', 'aria-hidden': 'true' });
-  swatch.style.height = '56px';
-  swatch.style.borderRadius = '8px';
-  swatch.style.marginBottom = '8px';
-  swatch.style.border = '1px solid #3d3d3d';
+  // The test patch sits on the real background, so it can vanish into it through the wrong lens.
+  const patch = h('div', { class: 'patch-colour', 'aria-hidden': 'true' });
+  const patchBox = h('div', { class: 'patch-box', 'aria-hidden': 'true' }, patch);
+  patchBox.style.background = bgHex;
 
   const slider = h('input', { type: 'range', min: '0', max: '255', step: '1', 'aria-label': `${options.title}: brightness` });
   const readout = h('output', null, '');
@@ -82,6 +119,16 @@ export function colourControl(options: {
     'aria-label': `${options.title}: hex colour`,
   });
   hex.spellcheck = false;
+
+  const rgbSliders = CHANNELS.map((c) => {
+    const lower = c.name.toLowerCase();
+    const range = h('input', { type: 'range', min: '0', max: '255', step: '1', class: 'rgb-range', 'aria-label': `${options.title}: ${lower} amount` });
+    range.style.setProperty('--track', `linear-gradient(to right, ${bgHex}, ${c.track})`);
+    const num = h('input', { type: 'number', min: '0', max: '255', step: '1', class: 'rgb-num', 'aria-label': `${options.title}: ${lower} value, 0 to 255` });
+    return { ...c, range, num };
+  });
+
+  const hint = h('p', { class: 'colour-hint small', 'aria-live': 'polite' });
 
   const paintWheel = () => {
     if (!ctx) return;
@@ -103,22 +150,82 @@ export function colourControl(options: {
     ctx.stroke();
   };
 
-  const refresh = (skipHex = false) => {
+  // The hint waits until the colour has stopped changing, so it never pops up while dragging.
+  // It sits in a reserved line inside this card, so nothing on the page jumps when it appears.
+  let hintTimer: ReturnType<typeof setTimeout> | null = null;
+  const renderHint = () => {
+    const issues = options.issues();
+    if (issues.includes('invisible')) {
+      hint.textContent = `Your ${eyes.sees} eye may not see this at all: it has no light the ${eyes.seesLens} lens lets through. Make it brighter.`;
+      hint.dataset.state = 'warn';
+    } else if (issues.includes('leak')) {
+      hint.textContent = `Note: this mix has a little light the ${eyes.hiddenLens} lens lets through. That is fine as long as the patch still vanishes in step 1.`;
+      hint.dataset.state = 'info';
+    } else {
+      hint.textContent = '';
+      delete hint.dataset.state;
+    }
+  };
+  const scheduleHint = () => {
+    if (hintTimer) clearTimeout(hintTimer);
+    hint.textContent = '';
+    delete hint.dataset.state;
+    hintTimer = setTimeout(() => {
+      hintTimer = null;
+      if (hint.isConnected) renderHint();
+    }, HINT_DELAY_MS);
+  };
+
+  const refresh = (o: { skipHex?: boolean; keepRgb?: boolean; immediateHint?: boolean } = {}) => {
     const c = options.get();
     const steps = Math.round(c.brightness * 255);
     slider.value = String(steps);
     readout.textContent = `${Math.round(c.brightness * 100)}%`;
     const drawn = drawnColour(c, options.background);
-    swatch.style.background = drawn;
-    if (!skipHex) hex.value = drawn;
+    patch.style.background = drawn;
+    if (!o.skipHex) hex.value = drawn;
+    const rgb = parseHex(drawn);
+    rgbSliders.forEach((s, i) => {
+      if (!o.keepRgb) s.range.value = String(rgb[i]);
+      if (document.activeElement !== s.num) s.num.value = s.range.value;
+    });
     paintWheel();
+    if (o.immediateHint) renderHint();
+    else scheduleHint();
   };
+
+  const setDrawn = (rgb: RGB) => options.set(lensColourFromDrawn(rgb, options.background));
 
   const setBrightnessSteps = (steps: number) => {
     const clamped = Math.max(0, Math.min(255, Math.round(steps)));
     options.set({ base: options.get().base, brightness: clamped / 255 });
     refresh();
   };
+
+  const fromSliders = (): RGB => [Number(rgbSliders[0].range.value), Number(rgbSliders[1].range.value), Number(rgbSliders[2].range.value)];
+  for (const s of rgbSliders) {
+    s.range.addEventListener('input', () => {
+      setDrawn(fromSliders());
+      // Keep the sliders where the finger is; rounding is tidied up when it lets go.
+      refresh({ keepRgb: true });
+    });
+    s.range.addEventListener('change', () => refresh());
+    const applyNum = () => {
+      const n = Number(s.num.value);
+      if (s.num.value.trim() === '' || !Number.isFinite(n)) {
+        refresh();
+        return;
+      }
+      s.range.value = String(Math.max(0, Math.min(255, Math.round(n))));
+      setDrawn(fromSliders());
+      refresh({ keepRgb: true });
+      s.num.value = s.range.value;
+    };
+    s.num.addEventListener('change', applyNum);
+    s.num.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') applyNum();
+    });
+  }
 
   const pick = (e: PointerEvent) => {
     const rect = wheel.getBoundingClientRect();
@@ -159,13 +266,7 @@ export function colourControl(options: {
       refresh();
       return;
     }
-    if (options.background === 'dark') {
-      // Split the typed colour into a full-value base and a brightness.
-      const { h: hue, s, v } = rgbToHsv(parseHex(typed));
-      options.set({ base: toHex(hsvToRgb(hue, s, 1)), brightness: v });
-    } else {
-      options.set({ base: typed, brightness: 1 });
-    }
+    setDrawn(parseHex(typed));
     refresh();
   };
   hex.addEventListener('change', applyHex);
@@ -173,18 +274,41 @@ export function colourControl(options: {
     if (e.key === 'Enter') applyHex();
   });
 
+  const vanish = options.background === 'dark' ? 'into the black' : 'into the white';
   const el = h(
     'div',
     { class: 'card colour-control' },
     h('h3', null, options.title),
-    h('p', { class: 'muted small' }, options.help),
+    h(
+      'p',
+      { class: 'eye-for small' },
+      'For your ',
+      h('strong', null, `${eyes.sees} eye`),
+      ` (${eyes.seesLens} lens${eyes.seesIsWeak ? ', weaker eye' : ', stronger eye'}) only.`,
+    ),
+    patchBox,
+    h(
+      'ol',
+      { class: 'cover-steps small' },
+      h(
+        'li',
+        null,
+        h('strong', null, `Cover your ${eyes.sees} eye.`),
+        ` Look with your ${eyes.hidden} eye (${eyes.hiddenLens} lens): the patch should vanish ${vanish}. If you still see it, move the sliders until it is gone.`,
+      ),
+      h(
+        'li',
+        null,
+        h('strong', null, `Now cover your ${eyes.hidden} eye.`),
+        ` With your ${eyes.sees} eye the patch should be clear. If it is too faint, make it brighter, then check step 1 again.`,
+      ),
+    ),
     h(
       'div',
-      { class: 'wheel-row' },
-      wheel,
-      h('div', { class: 'swatch-col' }, swatch, h('label', { class: 'small muted' }, 'Hex colour', hex)),
+      { class: 'rgb-sliders' },
+      ...rgbSliders.map((s) => h('label', { class: 'rgb-row' }, h('span', { class: 'rgb-name small' }, s.name), s.range, s.num)),
     ),
-    h('div', { class: 'small muted' }, 'Brightness'),
+    h('div', { class: 'small muted' }, 'Brightness (keeps the mix, makes all of it dimmer or brighter)'),
     h(
       'div',
       { class: 'slider-row' },
@@ -193,7 +317,14 @@ export function colourControl(options: {
       button('+', () => setBrightnessSteps(Number(slider.value) + 1), 'plain', { class: 'btn-small', 'aria-label': `${options.title}: one step brighter` }),
       readout,
     ),
+    hint,
+    h(
+      'details',
+      { class: 'more-colour' },
+      h('summary', { class: 'small' }, 'Colour wheel and hex code'),
+      h('div', { class: 'wheel-row' }, wheel, h('div', { class: 'swatch-col' }, h('label', { class: 'small muted' }, 'Hex colour', hex))),
+    ),
   );
-  refresh();
-  return { el, refresh: () => refresh() };
+  refresh({ immediateHint: true });
+  return { el, refresh: () => refresh({ immediateHint: true }) };
 }
