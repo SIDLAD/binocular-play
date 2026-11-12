@@ -7,6 +7,7 @@ import { IDLE_GAP_MS, SessionManager, freshSession, type SessionState } from '..
 import { createProfile, type Profile } from '../../src/core/settings/schema';
 import { seededRng, type GameAction } from '../../src/engine/api';
 import { CanvasChannelRenderer } from '../../src/engine/renderer';
+import { testContext } from '../../src/engine/testing/context';
 import { RecordingContext, meanLuminance } from '../../src/engine/testing/recordingContext';
 import { GAMES } from '../../src/games/registry';
 
@@ -235,7 +236,7 @@ describe('rule 5: safety', () => {
             const ctx = new RecordingContext();
             const renderer = new CanvasChannelRenderer(ctx, { current: NEUTRAL_PALETTE }, width, height);
             const rng = seededRng(42);
-            const game = def.create({ rng: seededRng(1234), startLevel: 1, reducedMotion, mode });
+            const game = def.create(testContext({ rng: seededRng(1234), reducedMotion, mode }));
             game.resize(width, height);
             const actions: GameAction[] = ['left', 'right', 'up', 'down', 'primary', 'secondary'];
             const held = new Set<GameAction>();
@@ -263,7 +264,7 @@ describe('rule 5: safety', () => {
               if (current.status().over && frame % 120 === 0) {
                 // Keep playing through game over, as a child would.
                 current.dispose();
-                current = def.create({ rng: seededRng(99 + restarts++), startLevel: 1, reducedMotion, mode });
+                current = def.create(testContext({ rng: seededRng(99 + restarts++), reducedMotion, mode }));
                 current.resize(width, height);
                 held.clear();
               }

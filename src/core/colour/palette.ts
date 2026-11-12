@@ -22,13 +22,17 @@ export function calibratedColour(cal: Calibration, key: ColourKey, background: R
   return mixGamma(background, parseHex(lens.base), lens.brightness);
 }
 
-export function resolvePalette(p: PaletteInput): Palette {
+/**
+ * `fullFellow` draws the fellow eye at full brightness. Stereo (depth) tasks use it:
+ * depth needs the two eyes' pictures matched, as in the anaglyph stereo study (Xi 2014).
+ */
+export function resolvePalette(p: PaletteInput, opts: { fullFellow?: boolean } = {}): Palette {
   const background = backgroundOf(p.vision);
   const map = channelLens(p.vision);
   const weakEye = calibratedColour(p.calibration, map.weakEye, background);
   const fellowFull = calibratedColour(p.calibration, map.fellowEye, background);
   // Hard rule 4: fellowContrast is read here and nowhere else.
-  const fellowEye = mixLinear(background, fellowFull, p.fellowContrast);
+  const fellowEye = mixLinear(background, fellowFull, opts.fullFellow ? 1 : p.fellowContrast);
   const foreground = p.vision.background === 'light' ? BLACK : WHITE;
   const both = mixGamma(background, foreground, p.calibration.bothBrightness);
   return { weakEye, fellowEye, both, background, mode: p.vision.background };

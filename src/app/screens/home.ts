@@ -1,7 +1,8 @@
 import { secondsOnDay, currentStreak } from '../../core/progress/sessionLog';
 import { isBlockedToday, localDay } from '../../core/safety/guards';
 import { formatClock, remainingMs } from '../../core/safety/session';
-import { GAMES } from '../../games/registry';
+import { gamesFor } from '../gameList';
+import { balanceDue } from './balance';
 import { drawAvatar } from '../components/art';
 import { channelCanvas } from '../components/channelCanvas';
 import { footer } from '../components/footer';
@@ -51,19 +52,25 @@ export const homeScreen: Screen = (app, _params, scope) => {
       h('div', { class: 'card' }, h('p', null, h('strong', null, 'Reminder from your grown-up: '), profile.session.patchReminder.note)),
     );
   }
+  if (profile.autoContrast.enabled && balanceDue(profile.autoContrast.balanceCheckedAt, now)) {
+    notices.push(
+      h('div', { class: 'card', 'data-testid': 'balance-due' }, h('p', null, 'Time for the weekly balance check (1 minute). ', link('Balance check', '#/balance'))),
+    );
+  }
   if (!app.store.persistOk) {
     notices.push(
       h('div', { class: 'notice' }, h('p', null, 'This browser is not letting the app save. Progress will be lost when you close the page (private windows do this).')),
     );
   }
 
+  const games = gamesFor(profile);
   const tiles =
-    GAMES.length === 0
+    games.length === 0
       ? h('div', { class: 'card' }, h('p', null, 'The first game is on its way.'))
       : h(
           'div',
           { class: 'tiles' },
-          ...GAMES.map((g) => {
+          ...games.map((g) => {
             const icon = channelCanvas(app.palette, scope, { width: 240, height: 150, draw: (r) => g.icon(r) });
             const best = profile.progress.best[g.id];
             return h(

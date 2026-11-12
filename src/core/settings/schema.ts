@@ -46,6 +46,28 @@ export interface SessionRecord {
   level: number;
   fellowContrast: number;
   endedBy: EndedBy;
+  /** Unpaused time minus idle stretches (10 s with no input in active games). */
+  activeSeconds: number;
+  /** Weak-eye-only prompts shown and caught, when the game has them. */
+  catchShown: number;
+  catchCaught: number;
+  /** Trials answered and correct (training tasks). */
+  trialsDone: number;
+  trialsCorrect: number;
+}
+
+export interface ContrastChange {
+  at: string;
+  from: number;
+  to: number;
+  reason: 'rise' | 'fall' | 'balance-check';
+}
+
+export interface DisplaySettings {
+  /** CSS px per mm, from the bank-card check. */
+  pxPerMm: number;
+  viewingDistanceCm: number;
+  checkedAt: string | null;
 }
 
 export interface Profile {
@@ -63,7 +85,21 @@ export interface Profile {
   calibration: Calibration;
   /** 0.1–1. Dims only the fellow-eye channel. */
   fellowContrast: number;
-  autoContrast: { enabled: boolean };
+  autoContrast: {
+    enabled: boolean;
+    /** Keep the current value: no rises or falls. */
+    hold: boolean;
+    /** Highest level from the latest balance check; rises never go above it. */
+    balanceMax: number | null;
+    balanceCheckedAt: string | null;
+    /** Local YYYY-MM-DD of the last day the policy was applied (once per day). */
+    lastDay: string | null;
+    log: ContrastChange[];
+  };
+  /** Difficulty and progress kept per game (numbers only). */
+  gameProgress: Record<string, Record<string, number>>;
+  /** Weekly goal set by a grown-up (or the adult player). */
+  goal: { daysPerWeek: number; minutesPerDay: number };
   session: {
     lengthMin: number;
     breakReminder: boolean;
@@ -81,6 +117,8 @@ export interface Profile {
 export interface AppData {
   version: 1;
   deviceId: string;
+  /** Per device, not per profile: the screen-size check. */
+  device: { display: DisplaySettings | null };
   activeProfileId: string | null;
   profiles: Profile[];
 }
@@ -129,7 +167,9 @@ export function createProfile(init: {
     vision: { glasses, redLensEye: 'left', weakEye: 'left', background: 'dark' },
     calibration: defaultCalibration(glasses),
     fellowContrast: 1,
-    autoContrast: { enabled: false },
+    autoContrast: { enabled: false, hold: false, balanceMax: null, balanceCheckedAt: null, lastDay: null, log: [] },
+    gameProgress: {},
+    goal: { daysPerWeek: 5, minutesPerDay: 20 },
     session: { lengthMin: 20, breakReminder: true, patchReminder: { enabled: false, note: '' } },
     safety: { doubleVisionBlockedOn: null, events: [] },
     progress: { sessions: [], best: {} },
@@ -138,5 +178,5 @@ export function createProfile(init: {
 }
 
 export function emptyAppData(): AppData {
-  return { version: 1, deviceId: randomId(), activeProfileId: null, profiles: [] };
+  return { version: 1, deviceId: randomId(), device: { display: null }, activeProfileId: null, profiles: [] };
 }

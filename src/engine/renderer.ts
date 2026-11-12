@@ -1,6 +1,8 @@
 import type { Palette } from '../core/colour/palette';
 import { mixGamma, toHex } from '../core/colour/srgb';
-import type { Channel, DrawOpts, Renderer, TextOpts, Transform } from './api';
+import type { BlobMask, Channel, DrawOpts, ImageSource, PatternSpec, Renderer, TextOpts, Transform } from './api';
+import { ditherField, fieldMean, maskField, maskedChannel, patternField } from './pixels';
+import { domSurfaces, stubSurfaces, type SurfaceFactory } from './surfaces';
 
 /** The part of CanvasRenderingContext2D the renderer uses. The recording context implements it too. */
 export interface Ctx2D {
@@ -29,7 +31,15 @@ export interface Ctx2D {
   fill(): void;
   stroke(): void;
   fillText(text: string, x: number, y: number): void;
+  imageSmoothingEnabled: boolean;
+  drawImage(image: CanvasImageSource, dx: number, dy: number, dw: number, dh: number): void;
 }
+
+/** Default display numbers before the screen-size check: 96 px/in at 60 cm. */
+const DEFAULT_PX_PER_DEGREE = 39.6;
+const PATTERN_CACHE = 48;
+/** Longest side, in pixels, of the working image for video and scenes. */
+const IMAGE_MAX_SIDE = 480;
 
 export interface PaletteProvider {
   readonly current: Palette;
@@ -47,16 +57,32 @@ export const UI_FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif
  * whichever shape uses it, so each eye still sees its own shape.
  */
 export class CanvasChannelRenderer implements Renderer {
+  pxPerDegree = DEFAULT_PX_PER_DEGREE;
+  pixelRatio = 1;
+  private surfaces: SurfaceFactory;
+  private patterns = new Map<string, { img: CanvasImageSource; n: number }>();
+  private frame = 0;
+  private lumaCache: { key: string; luma: Float32Array | null } | null = null;
+  private maskCache = new Map<string, { blobs: BlobMask['from']; field: Float32Array }>();
+
   constructor(
     private ctx: Ctx2D,
     private palette: PaletteProvider,
     public width: number,
     public height: number,
-  ) {}
+    surfaces?: SurfaceFactory,
+  ) {
+    this.surfaces = surfaces ?? domSurfaces() ?? stubSurfaces;
+  }
 
-  setSize(width: number, height: number): void {
+  setSize(width: number, height: number, pixelRatio = this.pixelRatio): void {
     this.width = width;
     this.height = height;
+    this.pixelRatio = pixelRatio;
+  }
+
+  setDisplay(pxPerDegree: number): void {
+    if (Number.isFinite(pxPerDegree) && pxPerDegree > 0) this.pxPerDegree = pxPerDegree;
   }
 
   private colour(ch: Channel, intensity: number | undefined): string {
@@ -91,6 +117,7 @@ export class CanvasChannelRenderer implements Renderer {
     ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = toHex(this.palette.current.background);
     ctx.fillRect(0, 0, this.width, this.height);
+    this.frame++;
   }
 
   rect(ch: Channel, x: number, y: number, w: number, h: number, o?: DrawOpts): void {
@@ -161,5 +188,75 @@ export class CanvasChannelRenderer implements Renderer {
     } finally {
       ctx.restore();
     }
+  }
+
+  pattern(ch: Channel, cx: number, cy: number, spec: PatternSpec, o?: { intensity?: number }): void {
+    const p = this.palette.current;
+    const colour = o?.intensity === undefined ? p[ch] : mixGamma(p.background, p[ch], o.intensity);
+    const dpr = this.pixelRatio;
+    const n = Math.max(2, Math.round(spec.size * dpr));
+    const cyclesPerPx = (spec.cyclesPerDegree ?? 0) / (this.pxPerDegree * dpr);
+    const grain = Math.max(1, Math.round((spec.grain ?? 2) * dpr));
+    const key = `${JSON.stringify(spec)}|${toHex(colour)}|${toHex(p.background)}|${n}|${cyclesPerPx.toFixed(6)}|${grain}`;
+    let entry = this.patterns.get(key);
+    if (!entry) {
+      const field = patternField(spec, n, cyclesPerPx, grain);
+      const data = ditherField(field, n, n, colour, p.background);
+      entry = { img: this.surfaces.bitmap(n, n, data, toHex(colour), fieldMean(field)), n };
+      this.patterns.set(key, entry);
+      if (this.patterns.size > PATTERN_CACHE) {
+        const oldest = this.patterns.keys().next().value;
+        if (oldest !== undefined) this.patterns.delete(oldest);
+      }
+    }
+    const size = n / dpr;
+    // Snap to whole device pixels so the dithered pattern is not resampled.
+    const left = Math.round((cx - size / 2) * dpr) / dpr;
+    const top = Math.round((cy - size / 2) * dpr) / dpr;
+    this.blit(ch, entry.img, left, top, size, size, false);
+  }
+
+  image(ch: Channel, src: ImageSource, x: number, y: number, w: number, h: number, mask: BlobMask, part: 'inside' | 'outside'): void {
+    if (w <= 0 || h <= 0) return;
+    const p = this.palette.current;
+    const scale = Math.min(1, IMAGE_MAX_SIDE / Math.max(w, h)) * Math.min(this.pixelRatio, 2);
+    const iw = Math.max(1, Math.round(w * scale));
+    const ih = Math.max(1, Math.round(h * scale));
+    const lumaKey = `${src.id}|${iw}x${ih}|${this.frame}`;
+    if (!this.lumaCache || this.lumaCache.key !== lumaKey) {
+      this.lumaCache = { key: lumaKey, luma: this.surfaces.luma(src, iw, ih) };
+    }
+    // Without a canvas to read (tests), a flat mid-grey picture keeps the masks testable.
+    const luma = this.lumaCache.luma ?? new Float32Array(iw * ih).fill(0.5);
+    const a = this.mask(mask.from, iw, ih);
+    const b = this.mask(mask.to, iw, ih);
+    const out = new Uint8ClampedArray(iw * ih * 4);
+    const coverage = maskedChannel(luma, a, b, mask.mix, part, p[ch], p.background, out);
+    const img = this.surfaces.bitmap(iw, ih, out, toHex(p[ch]), coverage, `img:${ch}:${part}`);
+    this.blit(ch, img, x, y, w, h, true);
+  }
+
+  private mask(blobs: BlobMask['from'], w: number, h: number): Float32Array {
+    const key = `${w}x${h}|${JSON.stringify(blobs)}`;
+    let m = this.maskCache.get(key);
+    if (!m) {
+      m = { blobs, field: maskField(blobs, w, h) };
+      this.maskCache.set(key, m);
+      if (this.maskCache.size > 8) {
+        const oldest = this.maskCache.keys().next().value;
+        if (oldest !== undefined) this.maskCache.delete(oldest);
+      }
+    }
+    return m.field;
+  }
+
+  private blit(ch: Channel, img: CanvasImageSource, x: number, y: number, w: number, h: number, smooth: boolean): void {
+    const ctx = this.ctx;
+    this.blend(ch);
+    const before = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = smooth;
+    ctx.drawImage(img, x, y, w, h);
+    ctx.imageSmoothingEnabled = before;
+    ctx.globalCompositeOperation = 'source-over';
   }
 }

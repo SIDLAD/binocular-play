@@ -9,9 +9,15 @@ export interface ShellPalette {
   subscribe(fn: () => void): () => void;
 }
 
+/** With no input for this long, an active game stops counting time as active. */
+export const IDLE_AFTER_MS = 10_000;
+
 export interface ShellCallbacks {
-  /** Called for every fixed step of active (unpaused, not over) play. */
-  onActiveTime(dtMs: number): void;
+  /**
+   * Called for every fixed step of unpaused play. `active` is false after IDLE_AFTER_MS
+   * with no input (never for passive games such as Watch mode).
+   */
+  onActiveTime(dtMs: number, active: boolean): void;
   /** Called after every step with the game's status. */
   onStatus(status: GameStatus): void;
 }
@@ -30,6 +36,9 @@ export class GameShell {
   private height = 300;
   private disposed = false;
   private wasOver = false;
+  private idleMs = 0;
+  private passive: boolean;
+  private pxPerDegree: () => number;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -37,7 +46,10 @@ export class GameShell {
     palette: ShellPalette,
     context: GameContext,
     private callbacks: ShellCallbacks,
+    options: { pxPerDegree?: () => number } = {},
   ) {
+    this.passive = def.passive === true;
+    this.pxPerDegree = options.pxPerDegree ?? (() => 0);
     let ctx: CanvasRenderingContext2D | null;
     try {
       ctx = canvas.getContext('2d');
@@ -53,8 +65,12 @@ export class GameShell {
     );
 
     const playing = () => this.loop.running && !this.wasOver;
-    this.cleanups.push(bindKeyboard((e) => this.game.input(e), playing));
-    this.cleanups.push(bindPointer(canvas, (e) => this.game.input(e), playing));
+    const send = (e: GameInput) => {
+      this.idleMs = 0;
+      this.game.input(e);
+    };
+    this.cleanups.push(bindKeyboard(send, playing));
+    this.cleanups.push(bindPointer(canvas, send, playing));
     // Hard rule 3: while paused, a colour change must still repaint the game behind the menu.
     this.cleanups.push(
       palette.subscribe(() => {
@@ -79,7 +95,8 @@ export class GameShell {
       return;
     }
     this.game.update(dtMs);
-    this.callbacks.onActiveTime(dtMs);
+    this.idleMs += dtMs;
+    this.callbacks.onActiveTime(dtMs, this.passive || this.idleMs <= IDLE_AFTER_MS);
     const status = this.game.status();
     this.callbacks.onStatus(status);
     if (status.over) this.reportOver(status);
@@ -106,7 +123,8 @@ export class GameShell {
     if (this.canvas.width !== pw) this.canvas.width = pw;
     if (this.canvas.height !== ph) this.canvas.height = ph;
     this.ctx2d?.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.renderer?.setSize(w, h);
+    this.renderer?.setSize(w, h, dpr);
+    this.renderer?.setDisplay(this.pxPerDegree());
     this.game.resize(w, h);
     this.renderOnce();
   }
@@ -118,7 +136,10 @@ export class GameShell {
 
   /** For on-screen buttons. */
   send(e: GameInput): void {
-    if (this.loop.running && !this.wasOver) this.game.input(e);
+    if (this.loop.running && !this.wasOver) {
+      this.idleMs = 0;
+      this.game.input(e);
+    }
   }
 
   /** Releases anything held, so a piece does not keep sliding after a pause. */
@@ -140,8 +161,14 @@ export class GameShell {
     return this.game.status();
   }
 
+  /** What the game wants kept for next time. */
+  save(): Record<string, number> | null {
+    return this.game.save ? this.game.save() : null;
+  }
+
   start(): void {
     if (this.disposed || this.wasOver) return;
+    this.idleMs = 0;
     this.loop.start();
   }
 

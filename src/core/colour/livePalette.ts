@@ -6,12 +6,12 @@ import { NEUTRAL_PALETTE, PaletteSource, resolvePalette } from './palette';
  * synchronously, so anything drawing through the channel renderer picks it up on
  * its next draw call with no reload.
  */
-export function createLivePalette(store: SettingsStore): PaletteSource {
+export function createLivePalette(store: SettingsStore, opts: { fullFellow?: boolean } = {}): PaletteSource & { dispose(): void } {
   const compute = () => {
     const p = store.activeProfile;
-    return p ? resolvePalette(p) : NEUTRAL_PALETTE;
+    return p ? resolvePalette(p, opts) : NEUTRAL_PALETTE;
   };
-  const source = new PaletteSource(compute());
-  store.subscribe(() => source.set(compute()));
+  const source = new PaletteSource(compute()) as PaletteSource & { dispose(): void };
+  source.dispose = store.subscribe(() => source.set(compute()));
   return source;
 }

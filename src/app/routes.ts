@@ -1,4 +1,6 @@
 import type { Screen } from './router';
+import { balanceScreen } from './screens/balance';
+import { displayScreen } from './screens/display';
 import { coloursScreen } from './screens/colours';
 import { evidenceScreen, treatmentsScreen } from './screens/evidence';
 import { homeScreen } from './screens/home';
@@ -20,6 +22,8 @@ export const ROUTES: Record<string, Screen> = {
   '/evidence': evidenceScreen,
   '/treatments': treatmentsScreen,
   '/stopped': stoppedScreen,
+  '/display': displayScreen,
+  '/balance': balanceScreen,
 };
 
 /** Reachable before onboarding is finished: the evidence must never be locked away. */

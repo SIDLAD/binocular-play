@@ -182,6 +182,20 @@ export const settingsScreen: Screen = (app) =>
           h('div', { class: 'slider-row' }, contrast, contrastOut),
         ),
         h('p', null, link('Open the Colours page', '#/colours', 'btn btn-plain'), ' for the colour wheel, the guided set-up and the hidden-number check.'),
+        autoContrastSettings(app),
+      ),
+      h(
+        'div',
+        { class: 'card' },
+        h('h2', null, 'Screen size'),
+        h(
+          'p',
+          null,
+          app.store.data.device.display?.checkedAt
+            ? `Checked on ${new Date(app.store.data.device.display.checkedAt).toLocaleDateString()}: sitting ${app.store.data.device.display.viewingDistanceCm} cm away. Saved for this device.`
+            : 'Not checked on this device yet. The training tasks use estimated sizes until it is.',
+        ),
+        link('Screen size check (1 minute)', '#/display', 'btn btn-plain', ),
       ),
       h(
         'div',
@@ -243,3 +257,31 @@ export const settingsScreen: Screen = (app) =>
       h('div', { class: 'row' }, link('Players', '#/profiles', 'btn btn-plain'), link('For grown-ups', '#/parent', 'btn btn-plain')),
     ];
   });
+
+/** The optional slow rise of the strong-eye brightness. Off by default. */
+function autoContrastSettings(app: App): HTMLElement {
+  const p = app.store.activeProfile;
+  const on = h('input', { type: 'checkbox', checked: p?.autoContrast.enabled ?? false, 'data-testid': 'auto-contrast' });
+  const hold = h('input', { type: 'checkbox', checked: p?.autoContrast.hold ?? false, 'data-testid': 'auto-contrast-hold' });
+  on.addEventListener('change', () =>
+    app.store.updateActive((d) => {
+      d.autoContrast.enabled = on.checked;
+    }),
+  );
+  hold.addEventListener('change', () =>
+    app.store.updateActive((d) => {
+      d.autoContrast.hold = hold.checked;
+    }),
+  );
+  return setting(
+    'Slow automatic change (optional)',
+    'Off unless you turn it on. Once a day, after 15 minutes of active play in a two-eye game: up 2 points if the game’s target was met, down 5 if not. Never above 80 % or above the level from the latest balance check. Every change is listed on the grown-ups page. A study found slow and fast increases worked the same, so changes here are small.',
+    h(
+      'div',
+      { class: 'stack' },
+      h('label', { class: 'check' }, on, h('span', null, 'Change the strong-eye brightness slowly')),
+      h('label', { class: 'check' }, hold, h('span', null, 'Hold at the current level')),
+      link('Balance check', '#/balance', 'btn btn-plain btn-small'),
+    ),
+  );
+}

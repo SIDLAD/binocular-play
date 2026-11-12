@@ -5,6 +5,7 @@ import { defaultCalibration } from '../../src/core/settings/schema';
 import { MemoryStorage, SettingsStore } from '../../src/core/settings/store';
 import { seededRng, type Game, type GameDefinition, type Renderer } from '../../src/engine/api';
 import { CanvasChannelRenderer } from '../../src/engine/renderer';
+import { testContext } from '../../src/engine/testing/context';
 import { RecordingContext } from '../../src/engine/testing/recordingContext';
 import { GAMES } from '../../src/games/registry';
 
@@ -15,6 +16,9 @@ const fixture: GameDefinition = {
   blurb: '',
   eyeRule: '',
   controls: [],
+  eyeMode: 'dichoptic',
+  group: 'games',
+  evidence: { badge: 'untested', note: '' },
   touchButtons: [],
   icon: () => {},
   create(): Game {
@@ -46,12 +50,7 @@ function setup() {
 
 /** Plays a little so that every channel has something on screen, then renders one frame. */
 function startGame(def: GameDefinition): Game {
-  const game = def.create({
-    rng: seededRng(7),
-    startLevel: 1,
-    reducedMotion: true,
-    mode: def.modes?.[0]?.id ?? 'default',
-  });
+  const game = def.create(testContext({ rng: seededRng(7), mode: def.modes?.[0]?.id ?? 'default' }));
   game.resize(400, 600);
   for (let frame = 0; frame < 900; frame++) {
     if (frame % 25 === 0) game.input({ kind: 'action', action: 'primary', pressed: true });
@@ -75,10 +74,14 @@ describe('rule 3: colours stay adjustable, live', () => {
         };
 
         // Start: red lens on the left, weak eye left, red/cyan glasses.
+        // What must be on screen depends on how the game uses the eyes:
+        //  dichoptic and stereo: both lens channels; weakEyeOnly: the weak eye plus the shared frame.
+        const needsFellow = def.eyeMode !== 'weakEyeOnly';
         let colours = frame();
         expect(toHex(palette.current.weakEye)).toBe('#ff0000');
         expect(colours.has('#ff0000')).toBe(true);
-        expect(colours.has('#00ffff')).toBe(true);
+        if (needsFellow) expect(colours.has('#00ffff')).toBe(true);
+        else expect(colours.has(toHex(palette.current.both))).toBe(true);
 
         // (a) Change the red-lens colour, as the Colours page or the pause menu would.
         store.updateActive((p) => {
@@ -97,7 +100,7 @@ describe('rule 3: colours stay adjustable, live', () => {
         expect(toHex(palette.current.weakEye)).toBe('#00ffff');
         colours = frame();
         expect(colours.has('#00ffff')).toBe(true);
-        expect(colours.has('#cc0000')).toBe(true);
+        if (needsFellow) expect(colours.has('#cc0000')).toBe(true);
 
         // (c) Switch glasses type (settings resets calibration to the new preset).
         store.updateActive((p) => {
@@ -106,7 +109,7 @@ describe('rule 3: colours stay adjustable, live', () => {
         });
         colours = frame();
         expect(colours.has('#00ff00')).toBe(true);
-        expect(colours.has('#ff0000')).toBe(true);
+        if (needsFellow) expect(colours.has('#ff0000')).toBe(true);
         expect(colours.has('#00ffff')).toBe(false);
 
         // Fellow-eye contrast is live too.
@@ -114,7 +117,7 @@ describe('rule 3: colours stay adjustable, live', () => {
           p.fellowContrast = 0.5;
         });
         colours = frame();
-        expect(colours.has(toHex(palette.current.fellowEye))).toBe(true);
+        if (needsFellow) expect(colours.has(toHex(palette.current.fellowEye))).toBe(true);
         expect(colours.has('#ff0000')).toBe(false);
 
         game.dispose();

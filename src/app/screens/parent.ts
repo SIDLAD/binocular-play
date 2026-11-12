@@ -1,4 +1,5 @@
-import { secondsOnDay } from '../../core/progress/sessionLog';
+import { activeSecondsOnDay, weekSummary } from '../../core/progress/sessionLog';
+import { catchFlagged } from '../../engine/catchTargets';
 import { clearDoubleVisionBlock, isBlockedToday, localDay } from '../../core/safety/guards';
 import { exportData, importData } from '../../core/settings/exportImport';
 import { findGame } from '../../games/registry';
@@ -35,14 +36,33 @@ export const parentScreen: Screen = (app) =>
     const days: { day: string; minutes: number }[] = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-      days.push({ day: localDay(d), minutes: Math.round(secondsOnDay(profile, localDay(d)) / 60) });
+      days.push({ day: localDay(d), minutes: Math.round(activeSecondsOnDay(profile, localDay(d)) / 60) });
     }
     const recent = profile.progress.sessions.slice(-10).reverse();
+    const week = weekSummary(profile, now);
+    const goal = profile.goal;
+    const flagged = profile.progress.sessions.filter((r) => catchFlagged({ shown: r.catchShown, caught: r.catchCaught })).slice(-5).reverse();
+    const catchCell = (r: (typeof recent)[number]) =>
+      r.catchShown > 0 ? `${r.catchCaught} of ${r.catchShown}` : r.trialsDone > 0 ? `${Math.round((100 * r.trialsCorrect) / r.trialsDone)}% right` : '–';
     const log = h(
       'div',
       { class: 'card' },
       h('h2', null, `${profile.name}’s play`),
-      h('p', null, `Last 7 days: ${days.reduce((a, d) => a + d.minutes, 0)} minutes. Today: ${days[6].minutes} minutes.`),
+      h(
+        'p',
+        { 'data-testid': 'week-summary' },
+        h('strong', null, `This week: ${week.activeMinutes} active minutes. `),
+        `Goal days reached: ${week.goalDays} of ${goal.daysPerWeek} (goal: ${goal.minutesPerDay} minutes a day). Today: ${days[6].minutes} active minutes.`,
+      ),
+      h('p', { class: 'muted small' }, '“Active” leaves out pauses and any stretch of 10 seconds or more with no input (except in Watch mode, where there is nothing to press).'),
+      flagged.length > 0
+        ? h(
+            'div',
+            { class: 'notice', 'data-testid': 'catch-flag' },
+            h('p', null, h('strong', null, 'Missed weak-eye prompts. '), `In ${flagged.length === 1 ? 'one recent round' : `${flagged.length} recent rounds`}, fewer than half of the prompts only the weaker eye can see were caught.`),
+            h('p', null, 'Check that the glasses are on, the right way round, and that the colours are set up (Colours → hidden-number check). If it keeps happening, mention it to your eye doctor. This is not a test result.'),
+          )
+        : null,
       h(
         'div',
         { class: 'table-wrap' },
@@ -56,7 +76,7 @@ export const parentScreen: Screen = (app) =>
             h(
               'table',
               null,
-              h('thead', null, h('tr', null, h('th', null, 'When'), h('th', null, 'Game'), h('th', null, 'Time'), h('th', null, 'Score'), h('th', null, 'Strong-eye brightness'), h('th', null, 'Ended'))),
+              h('thead', null, h('tr', null, h('th', null, 'When'), h('th', null, 'Game'), h('th', null, 'Time'), h('th', null, 'Score'), h('th', null, 'Weak-eye prompts / right'), h('th', null, 'Strong-eye brightness'), h('th', null, 'Ended'))),
               h(
                 'tbody',
                 null,
@@ -66,8 +86,9 @@ export const parentScreen: Screen = (app) =>
                     null,
                     h('td', null, new Date(r.date).toLocaleString()),
                     h('td', null, findGame(r.gameId)?.title ?? r.gameId),
-                    h('td', null, `${Math.max(1, Math.round(r.seconds / 60))} min`),
+                    h('td', null, `${Math.max(1, Math.round(r.activeSeconds / 60))} min`),
                     h('td', null, String(r.score)),
+                    h('td', null, catchCell(r)),
                     h('td', null, `${Math.round(r.fellowContrast * 100)}%`),
                     h('td', null, ENDED[r.endedBy] ?? r.endedBy),
                   ),
@@ -207,5 +228,66 @@ export const parentScreen: Screen = (app) =>
       ),
     );
 
-    return [log, reminder, safety, data];
+    // Weekly goal
+    const goalSelect = (label: string, options: number[], current: number, unit: string, set: (v: number) => void) => {
+      const el = h('select', { 'aria-label': label }, ...options.map((v) => h('option', { value: String(v) }, `${v} ${unit}`)));
+      el.value = String(current);
+      el.addEventListener('change', () => set(Number(el.value)));
+      return el;
+    };
+    const goalCard = h(
+      'div',
+      { class: 'card' },
+      h('h2', null, 'Weekly goal'),
+      h('p', { class: 'muted' }, 'A goal for motivation, shown on the home screen. Set it to what your eye doctor suggested. The app does not decide how much to play.'),
+      h(
+        'div',
+        { class: 'row' },
+        goalSelect('Days a week', [1, 2, 3, 4, 5, 6, 7], goal.daysPerWeek, 'days', (v) =>
+          app.store.updateActive((p) => {
+            p.goal.daysPerWeek = v;
+          }),
+        ),
+        h('span', null, '×'),
+        goalSelect('Minutes a day', [5, 10, 15, 20, 30, 45, 60], goal.minutesPerDay, 'minutes', (v) =>
+          app.store.updateActive((p) => {
+            p.goal.minutesPerDay = v;
+          }),
+        ),
+      ),
+    );
+
+    // Strong-eye brightness changes
+    const changes = profile.autoContrast.log.slice(-10).reverse();
+    const REASON: Record<string, string> = { rise: 'Slow rise (target met)', fall: 'Lowered (target missed)', 'balance-check': 'Balance check' };
+    const contrastCard = h(
+      'div',
+      { class: 'card', 'data-testid': 'contrast-log' },
+      h('h2', null, 'Strong-eye brightness changes'),
+      h(
+        'p',
+        null,
+        `Now ${Math.round(profile.fellowContrast * 100)}%. Slow automatic change is ${profile.autoContrast.enabled ? (profile.autoContrast.hold ? 'on, but held' : 'on') : 'off'} (Settings → Colours).`,
+      ),
+      changes.length === 0
+        ? h('p', { class: 'muted' }, 'No changes recorded yet.')
+        : h(
+            'div',
+            { class: 'table-wrap' },
+            h(
+              'table',
+              null,
+              h('thead', null, h('tr', null, h('th', null, 'When'), h('th', null, 'From'), h('th', null, 'To'), h('th', null, 'Why'))),
+              h(
+                'tbody',
+                null,
+                ...changes.map((c) =>
+                  h('tr', null, h('td', null, new Date(c.at).toLocaleString()), h('td', null, `${Math.round(c.from * 100)}%`), h('td', null, `${Math.round(c.to * 100)}%`), h('td', null, REASON[c.reason] ?? c.reason)),
+                ),
+              ),
+            ),
+          ),
+    );
+
+    return [log, goalCard, contrastCard, reminder, safety, data];
   });

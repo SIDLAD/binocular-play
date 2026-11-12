@@ -11,6 +11,12 @@ export const fallingBlocks: GameDefinition = {
     'Keyboard: arrow keys or A / D to move, up or W to turn, down or S to fall faster, space to drop.',
     'Touch: drag sideways to move, tap to turn, flick down to drop, or use the buttons.',
   ],
+  eyeMode: 'dichoptic',
+  group: 'games',
+  evidence: {
+    badge: 'trial',
+    note: 'A falling-blocks design like this was tested in children (Holmes 2016: worse than patching) and in teens and adults at home (BRAVO, Gao 2018: no better than a placebo game).',
+  },
   modes: [
     { id: 'classic', label: 'Classic', blurb: 'Pieces made of four blocks.' },
     { id: 'easy', label: 'Easy', blurb: 'Small pieces of one to three blocks.' },

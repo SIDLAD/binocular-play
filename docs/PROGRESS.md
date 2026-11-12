@@ -9,8 +9,8 @@ Every session: read this first, and update it before finishing. See `docs/PROMPT
 | 1 Foundation (settings, colours, onboarding, evidence pages) | **done** 2026-11-11 |
 | 2 First game (falling blocks, "Tumble Stack") | **done** 2026-11-12 |
 | 3 Evidence-based tasks (revised plan, `docs/PLAN-M3.md`) | in progress |
-| 3a Platform: screen-size check, pattern/image primitives, staircase, active minutes, catch check, eyeMode, contrast policy | in progress |
-| 3b Adult tasks: Letter Crowd, Stripe Finder, Depth Duel, Watch mode (Quiet Reef + own video), Evidence page | not started |
+| 3a Platform: screen-size check, pattern/image primitives, staircase, active minutes, catch check, eyeMode, contrast policy | **done** 2026-11-12 |
+| 3b Adult tasks: Letter Crowd, Stripe Finder, Depth Duel, Watch mode (Quiet Reef + own video), Evidence page | in progress |
 | 3c Star Patrol, Glow Bounce, Split Lines, weekly goal, today's task, sounds, home grouping | not started |
 | 4 Progress & polish (dashboard, PWA) | not started |
 | 5 Ship (CI, GitHub Pages, README) | not started |
@@ -24,6 +24,13 @@ Milestone 3 was re-planned on 2026-11-12 around the medical evidence (approved p
 
 The snake-like game and Twin Peek matching are in the backlog. The flanked-Gabor task (Polat 2004) is not built (needs sub-8-bit contrast).
 Still waiting on the user: the real-glasses test (checklist at the bottom).
+
+What 3a added that games use (all through `engine/api`):
+- `GameDefinition.eyeMode` (`dichoptic` | `weakEyeOnly` | `stereo`), `group`, `evidence { badge, note }`, optional `requiresNoEyeTurn`, `usesVisualAngle`, `passive`; `GameMode.needsVideo`, `riskyWithEyeTurn`.
+- `GameContext.saved` / `Game.save()` (numbers only, kept in `profile.gameProgress[gameId]`), `ctx.display` (px per degree), `ctx.media` (the player's video), `ctx.sound(kind)`.
+- `GameStatus.catches`, `trials`, `targetMet` (logged per round; `targetMet` drives the optional contrast policy).
+- `Renderer.pattern(ch, cx, cy, spec)` (dithered grating/noise, cycles per degree), `Renderer.image(ch, src, x, y, w, h, mask, part)` (video or a game-drawn scene as luminance, split by complementary blob masks), `r.pxPerDegree`, `r.pixelRatio`.
+- `Staircase`, `CatchSchedule`, `randomBlobs` are exported from `engine/api`.
 
 How to add a game (everything else comes for free):
 - Make `src/games/<id>/` with `logic.ts` (pure, tested), `game.ts` (implements `Game` from `src/engine/api.ts`) and `index.ts` (a `GameDefinition`). Copy the shape of `src/games/falling-blocks/`.
@@ -61,7 +68,19 @@ Rules from the user so far: do not push and do not add a git remote; update and 
 - 2026-11-12: On short landscape screens the touch buttons move to the left and right of the game. (Fable 5.2)
 - 2026-11-12: The Other treatments page opens with "Is playing these games enough on its own? No." and a list of what else is needed (exam, glasses, patching or drops if prescribed, check-ups, tell the eye doctor). Why: the user asked whether the games are sufficient; the page listed treatments but never answered that directly. It describes standard care in general and sets no dose. (Opus 5.5)
 
+- 2026-11-12: Milestone 3 re-planned around the evidence (`docs/PLAN-M3.md`, `docs/research/TASK-EVIDENCE.md`). Snake and matching moved to the backlog; the flanked-Gabor task is not built. (Opus 5.5)
+- 2026-11-12: Pure helpers games need (staircase, catch schedule, blob generator) are re-exported from `engine/api`, so rule 1 ("games import only engine/api") still holds. (Opus 5.5)
+- 2026-11-12: Patterns are dithered with Floyd–Steinberg error diffusion done in linear light; a primary the channel colour shares with the background is never touched, so eye separation survives dithering. Unit test: mean and contrast within 1 % down to 3 % contrast. (Opus 5.5)
+- 2026-11-12: Without a canvas (tests), the pattern and image primitives draw stand-in bitmaps that carry the channel colour and light coverage, so the live-colour and flash tests still cover them. Video/scene pixels are read from an offscreen canvas at most 480 px on the long side. (Opus 5.5)
+- 2026-11-12: Active time = unpaused time minus stretches of more than 10 s with no input (passive games excepted). The break countdown still uses all unpaused time (safer for breaks). Old session records count all their time as active. (Opus 5.5)
+- 2026-11-12: Stereo games get a palette with the fellow eye at full brightness (`resolvePalette(p, { fullFellow: true })`), still the one line that reads `fellowContrast`. Why: depth needs matched images (Xi 2014). (Opus 5.5)
+- 2026-11-12: "Eye-turn caution" = eye turn or double vision answered anything but a clear "no". It hides `requiresNoEyeTurn` games on home and on the play route, and hides `riskyWithEyeTurn` modes. (Opus 5.5)
+- 2026-11-12: Contrast policy (off by default): applied at most once a day, only for dichoptic games, when the day's active minutes first reach 15: +2 points if the round met its target, −5 if not; never above 80 % or the latest balance-check level; "hold" freezes it; every change is logged on the grown-ups page. The weekly balance check (`#/balance`) is offered on home only while the policy is on. (Opus 5.5)
+- 2026-11-12: Screen-size check (`#/display`) is per device. Narrow screens (< 600 px) match the card's short edge (53.98 mm), because a card is wider than a phone. Until it is done, sizes use estimates (3.8 px/mm desktop, 6.3 px/mm phone; 60 / 50 cm). (Opus 5.5)
+- 2026-11-12: Weekly goal (default 5 days × 20 min) lives in the profile and is set on the grown-ups page; home display is 3c. (Opus 5.5)
+
 ## Known issues / TODOs
+- Browser checks in this session ran with the preview pane hidden, so animation frames did not run: real-time play (rounds, idle detection, catches) was not watched in the browser. Unit/jsdom tests cover the timing logic.
 - Reloading or closing the tab in the middle of a round loses that round's log entry (session time is kept). A `pagehide` handler could save it.
 - Touch gestures on the canvas (drag, tap, flick) are covered by the flash test's random pointer input but were not tried with a real finger. The on-screen buttons were only checked for layout.
 - The game-over card was reached in the browser but not looked at in a screenshot.
@@ -96,6 +115,8 @@ Rules from the user so far: do not push and do not add a git remote; update and 
 - 2026-11-11, Fable 5.2: started Milestone 2 and paused at the user's request. Tumble Stack rules, drawing and definition, plus the engine loop, input and shell, are in; the play screen is not. 274 tests pass; lint and build clean; the new engine files are untested in a browser. Commit: "Milestone 2 (part): Tumble Stack rules, drawing and engine shell".
 - 2026-11-12, Fable 5.2: finished Milestone 2. Real play screen (start card, score/level/countdown, pause menu with colour sheet and stop button, touch buttons, game-over card, break overlay, session log). 276 tests pass; lint and build clean. In the browser: played a round with the keyboard; canvas pixels matched the palette (weak #ff0000, strong #009595 at 30 %, frame #999999); changing colours from the pause menu changed the pixels with no reload; phone portrait and landscape layouts fit; break overlay appeared at 0:00 and logged the round; no console errors. Commit: "Milestone 2: Tumble Stack playable end to end".
 - 2026-11-12, Opus 5.5: progress check against the original "Amblyopia game with red/blue glasses" chat: Milestones 1–2 match the user's stated requirements (gaps that are on the plan: hosting, README, Playwright smoke test, auto-contrast UI). Fast-forwarded `main` to the Milestones 1–2 branch at the user's request. Added the "enough on its own?" box to the Other treatments page. 277 tests pass; lint and build clean; checked the page in the browser.
+
+- 2026-11-12, Opus 5.5: Milestone 3 re-plan landed (`docs/PLAN-M3.md`, `docs/research/TASK-EVIDENCE.md`). Built 3a: visual-angle maths and screen-size check, dithered pattern and masked image primitives, staircase, catch schedule, contrast policy + balance check, active minutes, catch/trial logging, weekly goal data, eyeMode-aware rule 3 test, eye-turn hiding. 319 tests pass; lint and build clean. Browser: screen-size check saves per device; start card shows the evidence badge; grown-ups page shows active minutes, goal and contrast log; settings, display and balance pages fit at 375×812 and 812×375 with no horizontal scroll; no console errors.
 
 ## Real-glasses checklist for the user
 Run `npm run dev`, open http://localhost:5173, clear site data first if you want the first-run flow.

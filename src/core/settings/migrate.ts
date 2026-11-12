@@ -79,6 +79,64 @@ function sessionRecord(v: unknown): SessionRecord | null {
     level: Math.round(num(o.level, 1, 0, 1e6)),
     fellowContrast: num(o.fellowContrast, 1, 0, 1),
     endedBy: oneOf(o.endedBy, ENDED_BY, 'quit'),
+    // Records from before Milestone 3 had no idle tracking: all their time counts as active.
+    activeSeconds: Math.round(num(o.activeSeconds, num(o.seconds, 0, 0, 86400), 0, 86400)),
+    catchShown: Math.round(num(o.catchShown, 0, 0, 1e6)),
+    catchCaught: Math.round(num(o.catchCaught, 0, 0, 1e6)),
+    trialsDone: Math.round(num(o.trialsDone, 0, 0, 1e6)),
+    trialsCorrect: Math.round(num(o.trialsCorrect, 0, 0, 1e6)),
+  };
+}
+
+const MAX_GAMES = 40;
+const MAX_KEYS = 24;
+const MAX_CONTRAST_LOG = 200;
+
+function gameProgress(v: unknown): Record<string, Record<string, number>> {
+  const out: Record<string, Record<string, number>> = {};
+  for (const [game, raw] of Object.entries(obj(v)).slice(0, MAX_GAMES)) {
+    const inner: Record<string, number> = {};
+    for (const [k, val] of Object.entries(obj(raw)).slice(0, MAX_KEYS)) {
+      if (typeof val === 'number' && Number.isFinite(val)) inner[k.slice(0, 40)] = val;
+    }
+    out[game.slice(0, 80)] = inner;
+  }
+  return out;
+}
+
+function autoContrast(v: unknown): Profile['autoContrast'] {
+  const o = obj(v);
+  const balance = o.balanceMax;
+  return {
+    enabled: bool(o.enabled, false),
+    hold: bool(o.hold, false),
+    balanceMax: typeof balance === 'number' && Number.isFinite(balance) ? num(balance, 1, MIN_CONTRAST, 1) : null,
+    balanceCheckedAt: isoOrNull(o.balanceCheckedAt),
+    lastDay: dayOrNull(o.lastDay),
+    log: (Array.isArray(o.log) ? o.log : [])
+      .map((e) => {
+        const eo = obj(e);
+        const at = isoOrNull(eo.at);
+        if (!at) return null;
+        return {
+          at,
+          from: num(eo.from, 1, 0, 1),
+          to: num(eo.to, 1, 0, 1),
+          reason: oneOf(eo.reason, ['rise', 'fall', 'balance-check'] as const, 'rise'),
+        };
+      })
+      .filter((e): e is Profile['autoContrast']['log'][number] => e !== null)
+      .slice(-MAX_CONTRAST_LOG),
+  };
+}
+
+function display(v: unknown): AppData['device']['display'] {
+  const o = obj(v);
+  if (typeof o.pxPerMm !== 'number' || !Number.isFinite(o.pxPerMm)) return null;
+  return {
+    pxPerMm: num(o.pxPerMm, 3.78, 1, 40),
+    viewingDistanceCm: Math.round(num(o.viewingDistanceCm, 60, 20, 300)),
+    checkedAt: isoOrNull(o.checkedAt),
   };
 }
 
@@ -125,7 +183,12 @@ export function sanitizeProfile(v: unknown): Profile | null {
     },
     calibration: calibration(o.calibration, glasses),
     fellowContrast: num(o.fellowContrast, 1, MIN_CONTRAST, 1),
-    autoContrast: { enabled: bool(obj(o.autoContrast).enabled, false) },
+    autoContrast: autoContrast(o.autoContrast),
+    gameProgress: gameProgress(o.gameProgress),
+    goal: {
+      daysPerWeek: Math.round(num(obj(o.goal).daysPerWeek, 5, 1, 7)),
+      minutesPerDay: Math.round(num(obj(o.goal).minutesPerDay, 20, 5, 120)),
+    },
     session: {
       lengthMin: Math.round(num(se.lengthMin, 20, 5, 60)),
       breakReminder: bool(se.breakReminder, true),
@@ -178,6 +241,7 @@ export function sanitizeAppData(v: unknown): AppData {
   return {
     version: 1,
     deviceId: str(o.deviceId, def.deviceId, 80) || def.deviceId,
+    device: { display: display(obj(o.device).display) },
     activeProfileId: active,
     profiles,
   };

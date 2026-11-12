@@ -1,9 +1,14 @@
+import { dayOutcome, nextContrast } from '../../core/adaptive/contrastPolicy';
+import { createLivePalette } from '../../core/colour/livePalette';
 import { DISCLAIMER_SHORT } from '../../core/content/copy';
-import { addSessionRecord, makeRecord } from '../../core/progress/sessionLog';
-import { canStartGame } from '../../core/safety/guards';
+import { displayInfo } from '../../core/display/visualAngle';
+import { activeSecondsOnDay, addSessionRecord, makeRecord } from '../../core/progress/sessionLog';
+import { canStartGame, localDay } from '../../core/safety/guards';
+import { eyeTurnCaution } from '../../core/safety/screening';
 import { formatClock, remainingMs } from '../../core/safety/session';
-import type { EndedBy } from '../../core/settings/schema';
-import { seededRng, type GameContext, type GameDefinition, type GameStatus } from '../../engine/api';
+import type { EndedBy, Profile } from '../../core/settings/schema';
+import { seededRng, type GameContext, type GameDefinition, type GameMode, type GameStatus } from '../../engine/api';
+import { VideoMedia } from '../../engine/media';
 import { GameShell } from '../../engine/shell';
 import { findGame } from '../../games/registry';
 import type { App } from '../app';
@@ -13,6 +18,9 @@ import { page } from '../components/footer';
 import { breakOverlay, doubleVisionCheck, pauseMenu, stopForDoubleVision } from '../components/safety';
 import { button, clear, h, isTouchDevice, link, prefersReducedMotion, type Scope } from '../dom';
 import type { Screen } from '../router';
+import { playTone } from '../sound';
+import { devicePixelRatioNow } from '../components/channelCanvas';
+import { evidenceBadgeLabel } from '../components/badges';
 
 /**
  * The play route. Whether a game may start is decided by canStartGame() and nothing else
@@ -39,8 +47,41 @@ export const playScreen: Screen = (app, params, scope) => {
   if (!def || !profile) {
     return page('Game not found', [h('p', null, 'That game does not exist.'), link('Back to the games', '#/', 'btn btn-primary')], { back: '/' });
   }
+  if (def.requiresNoEyeTurn && eyeTurnCaution(profile.onboarding.screening)) {
+    return page(
+      def.title,
+      [
+        h(
+          'div',
+          { class: 'notice', 'data-testid': 'hidden-for-eye-turn' },
+          h('p', null, h('strong', null, 'This task is switched off for this player.')),
+          h(
+            'p',
+            null,
+            'It trains depth (seeing in 3D). The safety questions said an eye turns, there has been double vision, or you were not sure. Depth training carries more risk then, so it stays off. Ask your eye doctor or orthoptist about depth training.',
+          ),
+        ),
+        link('Back to the games', '#/', 'btn btn-primary'),
+      ],
+      { back: '/' },
+    );
+  }
   return gameScreen(app, def, profile.id, scope);
 };
+
+/** Size and viewing distance numbers for the current screen. */
+export function currentDisplay(app: App) {
+  const w = typeof window !== 'undefined' ? window.innerWidth : 1024;
+  const hgt = typeof window !== 'undefined' ? window.innerHeight : 768;
+  return displayInfo(app.store.data.device.display, devicePixelRatioNow(), Math.min(w, hgt));
+}
+
+/** Modes a player may see: stereo and push modes are hidden after a risky screening answer. */
+export function visibleModes(def: GameDefinition, p: Profile | null): GameMode[] {
+  const modes = def.modes ?? [{ id: 'default', label: 'Play', blurb: '' }];
+  const caution = !p || eyeTurnCaution(p.onboarding.screening);
+  return modes.filter((m) => !(m.riskyWithEyeTurn && caution));
+}
 
 type Phase = 'start' | 'playing' | 'paused' | 'break' | 'over';
 
@@ -48,8 +89,15 @@ type Phase = 'start' | 'playing' | 'paused' | 'break' | 'over';
 function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Scope): HTMLElement {
   let phase: Phase = 'start';
   let mode = def.modes?.[0]?.id ?? 'default';
-  /** Active play time of the current round. */
+  /** Unpaused play time of the current round. */
   let roundMs = 0;
+  /** The same, minus idle stretches. */
+  let roundActiveMs = 0;
+  let media: VideoMedia | null = null;
+  // Depth tasks show both eyes at full brightness (see resolvePalette).
+  const stereoPalette = def.eyeMode === 'stereo' ? createLivePalette(app.store, { fullFellow: true }) : null;
+  const palette = stereoPalette ?? app.palette;
+  scope.onDispose(() => stereoPalette?.dispose());
   let roundLogged = true;
   /** Play time not yet written to the session. */
   let unsavedMs = 0;
@@ -63,12 +111,22 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
   const stage = h('div', { class: 'stage' }, canvas);
   const layer = h('div', { class: 'play-layer' });
 
-  const context = (): GameContext => ({
-    rng: seededRng(Math.floor(Math.random() * 0xffffffff)),
-    startLevel: 1,
-    reducedMotion: prefersReducedMotion(app.store.activeProfile?.ui.reducedMotion ?? 'system'),
-    mode,
-  });
+  const context = (): GameContext => {
+    const p = app.store.activeProfile;
+    const d = currentDisplay(app);
+    return {
+      rng: seededRng(Math.floor(Math.random() * 0xffffffff)),
+      startLevel: 1,
+      reducedMotion: prefersReducedMotion(p?.ui.reducedMotion ?? 'system'),
+      mode,
+      saved: p?.gameProgress[def.id] ?? null,
+      display: { pxPerDegree: d.pxPerDegree, devicePxPerDegree: d.devicePxPerDegree, measured: d.measured },
+      media,
+      sound: (kind) => {
+        if (app.store.activeProfile?.ui.sound) playTone(kind);
+      },
+    };
+  };
 
   const lengthMin = () => app.store.activeProfile?.session.lengthMin ?? 20;
   const session = () => app.session.peek(profileId, app.now().getTime());
@@ -94,6 +152,7 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
     // Very short rounds are noise, except a safety stop, which is always recorded.
     if (roundMs < 1000 && endedBy !== 'doubleVision') return false;
     const status = shell.status();
+    const saved = shell.save();
     let best = false;
     app.store.updateProfile(profileId, (p) => {
       best = addSessionRecord(
@@ -101,15 +160,34 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
         makeRecord({
           gameId: def.id,
           seconds: roundMs / 1000,
+          activeSeconds: roundActiveMs / 1000,
           score: status.score,
           level: status.level,
           fellowContrast: p.fellowContrast,
           endedBy,
           now: app.now(),
+          catches: status.catches,
+          trials: status.trials,
         }),
       );
+      if (saved) p.gameProgress[def.id] = saved;
+      if (endedBy !== 'doubleVision') applyContrastPolicy(p, status);
     });
     return best;
+  };
+
+  /** The optional slow contrast rise: at most once a day, logged for the grown-ups page. */
+  const applyContrastPolicy = (p: Profile, status: GameStatus) => {
+    if (!p.autoContrast.enabled || def.eyeMode !== 'dichoptic') return;
+    const today = localDay(app.now());
+    if (p.autoContrast.lastDay === today) return;
+    const outcome = dayOutcome(activeSecondsOnDay(p, today) / 60, status.targetMet);
+    if (!outcome) return;
+    p.autoContrast.lastDay = today;
+    const to = nextContrast(p.fellowContrast, outcome, { hold: p.autoContrast.hold, balanceMax: p.autoContrast.balanceMax });
+    if (to === p.fellowContrast) return;
+    p.autoContrast.log.push({ at: app.now().toISOString(), from: p.fellowContrast, to, reason: outcome === 'qualified' ? 'rise' : 'fall' });
+    p.fellowContrast = to;
   };
 
   const setLayer = (el: HTMLElement | null, sheet = false) => {
@@ -124,9 +202,10 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
     }
   };
 
-  const shell = new GameShell(canvas, def, app.palette, context(), {
-    onActiveTime(dtMs) {
+  const shell = new GameShell(canvas, def, palette, context(), {
+    onActiveTime(dtMs, active) {
       roundMs += dtMs;
+      if (active) roundActiveMs += dtMs;
       unsavedMs += dtMs;
       if (unsavedMs >= 1000) {
         saveTime();
@@ -138,13 +217,20 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
       showStatus(status);
       if (status.over && phase === 'playing') gameOver(status);
     },
-  });
+  }, { pxPerDegree: () => currentDisplay(app).pxPerDegree });
 
   const begin = (chosen: string) => {
+    const chosenMode = def.modes?.find((m) => m.id === chosen);
+    if (chosenMode?.needsVideo && !media) {
+      showVideoPicker(chosen);
+      return;
+    }
     endRound('quit');
     mode = chosen;
     shell.restart(context());
     roundMs = 0;
+    roundActiveMs = 0;
+    media?.play();
     roundLogged = false;
     phase = 'playing';
     setLayer(null);
@@ -157,7 +243,34 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
     if (phase !== 'paused' && phase !== 'break') return;
     phase = 'playing';
     setLayer(null);
+    media?.play();
     shell.start();
+  };
+
+  /** Asks for a video file. It is played from this device only and never stored. */
+  const showVideoPicker = (chosen: string) => {
+    const input = h('input', { type: 'file', accept: 'video/*', 'data-testid': 'video-file' });
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      media?.dispose();
+      media = new VideoMedia(file);
+      begin(chosen);
+    });
+    setLayer(
+      h(
+        'div',
+        { class: 'overlay' },
+        h(
+          'div',
+          { class: 'dialog', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Choose a video', 'data-testid': 'video-picker' },
+          h('h2', null, 'Choose a video'),
+          h('p', null, 'Pick a video file from this device. It plays here only: it is not uploaded and not saved. Choose one with calm scenes.'),
+          h('label', { class: 'btn btn-primary btn-big' }, 'Choose a video file', input),
+          button('Back', showStart, 'plain'),
+        ),
+      ),
+    );
   };
 
   const showPauseMenu = () => {
@@ -186,6 +299,7 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
     if (phase !== 'playing') return;
     phase = 'paused';
     shell.pause();
+    media?.pause();
     saveTime();
     showPauseMenu();
   }
@@ -204,6 +318,7 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
 
   const gameOver = (status: GameStatus) => {
     phase = 'over';
+    media?.pause();
     const best = endRound('gameOver');
     setLayer(
       h(
@@ -227,6 +342,7 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
     if (remainingMs(p.session.lengthMin, s) > 0) return;
     phase = 'break';
     shell.pause();
+    media?.pause();
     app.session.markBreakShown(profileId, app.now().getTime());
     const note = p.session.patchReminder.enabled ? p.session.patchReminder.note.trim() : '';
     setLayer(
@@ -247,9 +363,18 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
     );
   };
 
-  const showStart = () => {
+  function showStart(): void {
     phase = 'start';
-    const modes = def.modes ?? [{ id: 'default', label: 'Play', blurb: '' }];
+    const modes = visibleModes(def, app.store.activeProfile);
+    const disp = currentDisplay(app);
+    const distance = h(
+      'div',
+      { class: 'card', 'data-testid': 'distance-note' },
+      h('p', null, h('strong', null, `Sit about ${disp.viewingDistanceCm} cm from the screen`), ' (about an arm’s length).'),
+      disp.measured
+        ? null
+        : h('p', { class: 'small' }, 'Sizes are estimates until the screen-size check is done. ', link('Check screen size (1 minute)', '#/display')),
+    );
     setLayer(
       h(
         'div',
@@ -259,6 +384,7 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
           { class: 'dialog', role: 'dialog', 'aria-modal': 'true', 'aria-label': def.title, 'data-testid': 'start-card' },
           h('h2', null, def.title),
           h('p', null, def.blurb),
+          def.usesVisualAngle ? distance : null,
           h(
             'div',
             { class: 'stack' },
@@ -275,12 +401,15 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
           h('p', { class: 'small' }, def.eyeRule),
           h('h3', null, 'How to play'),
           h('ul', { class: 'small' }, ...def.controls.map((c) => h('li', null, c))),
+          h('h3', null, 'Where this idea comes from'),
+          h('p', { class: 'small' }, h('span', { class: 'badge' }, evidenceBadgeLabel(def.evidence.badge)), ' ', def.evidence.note),
+          def.group === 'training' ? h('p', { class: 'small muted' }, 'The level here is a training level, not an eye test.') : null,
           h('p', { class: 'small muted' }, DISCLAIMER_SHORT),
           link('Back to the games', '#/', 'btn btn-plain'),
         ),
       ),
     );
-  };
+  }
 
   // On-screen buttons for touch.
   let touch: HTMLElement | null = null;
@@ -339,6 +468,7 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
     // Leaving mid-round (back button, another link) still counts as play.
     endRound('quit');
     shell.dispose();
+    media?.dispose();
   });
 
   showTime();

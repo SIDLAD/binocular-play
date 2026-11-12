@@ -3,7 +3,7 @@ import type { Ctx2D } from '../renderer';
 
 /** One painted shape, as seen by tests. */
 export interface PaintOp {
-  kind: 'fill' | 'stroke' | 'text';
+  kind: 'fill' | 'stroke' | 'text' | 'image';
   /** Lowercase #rrggbb. */
   style: string;
   blend: string;
@@ -26,6 +26,7 @@ export class RecordingContext implements Ctx2D {
   textAlign: CanvasTextAlign = 'start';
   textBaseline: CanvasTextBaseline = 'alphabetic';
   globalCompositeOperation: GlobalCompositeOperation = 'source-over';
+  imageSmoothingEnabled = true;
 
   ops: PaintOp[] = [];
 
@@ -132,6 +133,16 @@ export class RecordingContext implements Ctx2D {
     const size = parseFloat(/(\d+(?:\.\d+)?)px/.exec(this.font)?.[1] ?? '10');
     // Glyphs cover very roughly a quarter of their em box.
     this.record('text', this.fillStyle, text.length * size * size * 0.25);
+  }
+
+  /**
+   * Images are the pattern and video primitives. Their stand-in bitmap carries the channel
+   * colour (`peak`) and the share of that colour's light it carries (`coverage`), so the
+   * recorded area is scaled to give the right mean brightness.
+   */
+  drawImage(image: CanvasImageSource, _x: number, _y: number, w: number, h: number): void {
+    const stub = image as unknown as { peak?: string; coverage?: number };
+    this.record('image', stub.peak ?? '#000000', Math.abs(w * h) * (stub.coverage ?? 1));
   }
 
   /** The set of colours painted since the last reset. */

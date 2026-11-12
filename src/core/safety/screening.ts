@@ -25,6 +25,14 @@ export function hasRiskFlag(s: Screening): boolean {
   return s.eyeTurn === true || s.everDouble === true;
 }
 
+/**
+ * Stereo and push modes are hidden unless both answers are a clear "no". "Not sure" is
+ * stored as yes, and an unanswered question also counts.
+ */
+export function eyeTurnCaution(s: Screening): boolean {
+  return s.eyeTurn !== false || s.everDouble !== false;
+}
+
 /** The "talk to your eye doctor first" screen is shown for a risk flag or when no clinician has said OK. */
 export function needsDoctorScreen(s: Screening): boolean {
   return hasRiskFlag(s) || s.clinicianOk === false;
