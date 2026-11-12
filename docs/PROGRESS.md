@@ -8,15 +8,22 @@ Every session: read this first, and update it before finishing. See `docs/PROMPT
 | 0 Plan | **done**, approved by the user 2026-11-11 (`docs/PLAN.md`) |
 | 1 Foundation (settings, colours, onboarding, evidence pages) | **done** 2026-11-11 |
 | 2 First game (falling blocks, "Tumble Stack") | **done** 2026-11-12 |
-| 3 Four more games | not started |
+| 3 Evidence-based tasks (revised plan, `docs/PLAN-M3.md`) | in progress |
+| 3a Platform: screen-size check, pattern/image primitives, staircase, active minutes, catch check, eyeMode, contrast policy | in progress |
+| 3b Adult tasks: Letter Crowd, Stripe Finder, Depth Duel, Watch mode (Quiet Reef + own video), Evidence page | not started |
+| 3c Star Patrol, Glow Bounce, Split Lines, weekly goal, today's task, sounds, home grouping | not started |
 | 4 Progress & polish (dashboard, PWA) | not started |
 | 5 Ship (CI, GitHub Pages, README) | not started |
 
 ## Next step
-Milestones 1 and 2 are done. Two things are waiting, in this order:
+Milestone 3 was re-planned on 2026-11-12 around the medical evidence (approved plan: `docs/PLAN-M3.md`; evidence: `docs/research/TASK-EVIDENCE.md`). Build in order:
 
-1. **The user's real-glasses test** (checklist at the bottom of this file). Fix what it finds before building more games: every later game reuses the same renderer, calibration and play screen.
-2. **Milestone 3** (`docs/PROMPT.md`, designs in `docs/PLAN.md` §6): four more games, the low-effort aquarium, reading mode, adaptive difficulty, WebAudio sounds, weekly goals and streaks.
+1. **3a platform pieces**: screen-size check (`core/display/visualAngle.ts`, device setting), `Renderer.pattern` (dithered gratings/noise), `Renderer.image` with complementary blob masks, shared staircase (`core/adaptive/staircase.ts`) with per-profile `gameProgress`, active-minute logging and catch accuracy, weak-eye catch targets, `GameDefinition.eyeMode` + `requiresNoEyeTurn`, contrast policy (+2 / −5, cap 80 %, hold).
+2. **3b adult tasks**: Letter Crowd, Stripe Finder, Depth Duel, Watch mode (Quiet Reef + local video), Evidence page Adults section.
+3. **3c**: Star Patrol, Glow Bounce, Split Lines, weekly goal + streak, today's task, WebAudio tones, home grouping with evidence badges.
+
+The snake-like game and Twin Peek matching are in the backlog. The flanked-Gabor task (Polat 2004) is not built (needs sub-8-bit contrast).
+Still waiting on the user: the real-glasses test (checklist at the bottom).
 
 How to add a game (everything else comes for free):
 - Make `src/games/<id>/` with `logic.ts` (pure, tested), `game.ts` (implements `Game` from `src/engine/api.ts`) and `index.ts` (a `GameDefinition`). Copy the shape of `src/games/falling-blocks/`.
