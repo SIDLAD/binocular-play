@@ -14,6 +14,8 @@ export function footer(): HTMLElement {
     ),
     h('p', null, DISCLAIMER_SHORT),
     h('p', null, `${FREE_PROMISE} ${PRIVACY_LINE} Open source, MIT licence.`),
+    // Plain pages (built by scripts/seo-pages.ts) so search engines can find the content.
+    h('p', { class: 'small muted' }, link('About this app (printable pages)', './about/')),
   );
 }
 

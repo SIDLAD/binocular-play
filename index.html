@@ -11,12 +11,37 @@
       name="description"
       content="Free, open-source two-eye (dichoptic) games played with red/blue glasses. Not a medical device."
     />
-    <title>Binocular Play</title>
+    <title>Binocular Play: free two-eye games for amblyopia (lazy eye)</title>
+    <link rel="canonical" href="https://sidlad.github.io/binocular-play/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Binocular Play" />
+    <meta property="og:title" content="Binocular Play: free two-eye games for amblyopia" />
+    <meta
+      property="og:description"
+      content="Free, open-source red/blue anaglyph games and training tasks for people with amblyopia (lazy eye). Runs in the browser, no account. Not a medical device."
+    />
+    <meta property="og:url" content="https://sidlad.github.io/binocular-play/" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Binocular Play",
+        "url": "https://sidlad.github.io/binocular-play/",
+        "applicationCategory": "GameApplication",
+        "operatingSystem": "Any (web browser)",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "description": "Free, open-source dichoptic (red/blue anaglyph) games for amblyopia. Not a medical device."
+      }
+    </script>
     <link rel="icon" href="data:," />
   </head>
   <body>
     <div id="app"></div>
-    <noscript>Binocular Play needs JavaScript to run.</noscript>
+    <noscript>
+      Binocular Play needs JavaScript to run. Read <a href="./about/">what it is</a>,
+      <a href="./evidence/">the evidence</a> and <a href="./treatments/">other treatments</a>.
+    </noscript>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
