@@ -38,7 +38,7 @@ How to add a game (everything else comes for free):
 - A game may import only `engine/api` and its own files, never picks a colour, and uses `ctx.rng` instead of `Math.random` (rule 1 test and ESLint enforce this). It must draw something at full intensity in both eye channels within the first seconds of play (rule 3 test).
 - Anything a player needs in order to play goes to `weakEye` or `fellowEye`, split so neither eye can play alone. Only frames and grids go to `both`.
 
-Rules from the user so far: do not push and do not add a git remote; update and commit this file after every milestone.
+Rules from the user so far: update and commit this file after every milestone. On 2026-11-12 the user lifted the earlier "do not push, do not add a remote" rule: the GitHub remote `origin` (https://github.com/SIDLAD/binocular-play, public) is allowed, and `main` deploys to GitHub Pages through `.github/workflows/pages.yml`. Push only `main` changes the user wants live.
 
 ## Decisions log
 - 2026-11-11: Stack is Vite + TypeScript + Canvas 2D, static site on GitHub Pages, MIT license. No backend, analytics or accounts. (Planning session, Opus 5.5)
@@ -124,7 +124,8 @@ Rules from the user so far: do not push and do not add a git remote; update and 
 - To start from scratch in the browser: clear site data, or delete the `binocular-play` key in localStorage.
 
 ## Repo state
-- Git repo initialised on branch `main`. No remote. Nothing has been pushed.
+- Remote `origin` = https://github.com/SIDLAD/binocular-play (public). Every push to `main` runs the tests, builds and deploys to GitHub Pages: https://sidlad.github.io/binocular-play/
+- A private claude.ai preview of the Milestone 3 build also exists: https://claude.ai/artifact/BNdzmSEPqhog2aHTbJoDY1 (republish from `dist/index.html` + `dist/assets/*`).
 - `.claude/settings.local.json` is local-only and is listed in `.gitignore`.
 
 ## Session log
