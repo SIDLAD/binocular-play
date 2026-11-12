@@ -1,5 +1,6 @@
 import {
   ADULTS,
+  ENOUGH_ON_ITS_OWN,
   EXERCISES_NOTE,
   LEAFLETS,
   LESSON,
@@ -47,6 +48,15 @@ export const treatmentsScreen: Screen = () =>
   page(
     'Other treatments',
     [
+      h(
+        'div',
+        { class: 'notice', 'data-testid': 'enough-on-its-own' },
+        h('h2', null, ENOUGH_ON_ITS_OWN.question),
+        h('p', null, ENOUGH_ON_ITS_OWN.answer),
+        h('p', null, h('strong', null, 'What else is needed:')),
+        h('ul', null, ...ENOUGH_ON_ITS_OWN.alsoNeeded.map((s) => h('li', null, s))),
+        h('p', null, link('See the trials', '#/evidence', 'btn btn-plain')),
+      ),
       h('p', null, 'These are the treatments eye doctors use for amblyopia. This app is not one of them and does not replace any of them.'),
       h(
         'div',

@@ -185,6 +185,20 @@ export const TREATMENTS: Treatment[] = [
   },
 ];
 
+/** Answers "is playing enough?" at the top of the Other treatments page. Describes standard care in general; never sets a dose. */
+export const ENOUGH_ON_ITS_OWN = {
+  question: 'Is playing these games enough on its own?',
+  answer:
+    'No. Binocular Play has never been tested in a trial, and simple tablet games like it did worse than patching in the largest trials. Use it only as an extra, alongside what your eye doctor prescribes.',
+  alsoNeeded: [
+    'An eye exam. Only an eye doctor or orthoptist can say what kind of amblyopia it is and what it needs.',
+    'Glasses, if they are prescribed. Wear them as your eye doctor says, including while you play.',
+    'Patching or atropine drops, if they are prescribed. These have the strongest evidence. Do not cut down on them because you are playing here.',
+    'Check-ups. The eye doctor checks progress and changes the plan. Amblyopia can come back after treatment stops, so check-ups may carry on for a while.',
+    'Tell your eye doctor you are using this app.',
+  ],
+};
+
 export const EXERCISES_NOTE =
   'What about eye exercises? We found no strong evidence that home eye exercises help amblyopia, so this app does not suggest any. Your eye doctor or orthoptist may give you exercises: follow their plan.';
 

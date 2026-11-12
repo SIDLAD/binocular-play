@@ -30,6 +30,12 @@ describe('copy rules', () => {
     expect(summary).toContain('not been shown to be better than patching');
   });
 
+  it('says plainly that playing is not enough on its own', () => {
+    expect(evidence.ENOUGH_ON_ITS_OWN.answer).toMatch(/^No\./);
+    const needed = evidence.ENOUGH_ON_ITS_OWN.alsoNeeded.join(' ');
+    for (const word of ['eye exam', 'Glasses', 'Patching', 'Check-ups']) expect(needed).toContain(word);
+  });
+
   it('every evidence item has at least one https source', () => {
     const items = [...evidence.POSITIVE, ...evidence.NEGATIVE, evidence.LESSON, evidence.ADULTS, evidence.SAFETY_POINTS];
     expect(evidence.NEGATIVE.length).toBeGreaterThanOrEqual(3);
