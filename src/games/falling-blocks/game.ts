@@ -53,6 +53,8 @@ export class TumbleStack implements Game {
   private clockMs = 0;
   private drag: Drag | null = null;
   private fadeMs: number;
+  private sawClearing = false;
+  private lastLevel = 1;
 
   constructor(private ctx: GameContext) {
     this.fadeMs = ctx.reducedMotion ? 0 : CLEAR_FADE_MS;
@@ -150,6 +152,12 @@ export class TumbleStack implements Game {
       }
     }
     advance(this.state, dtMs, this.ctx.rng, { softDrop: this.held.has('down'), fadeMs: this.fadeMs });
+    // Soft tones: one when rows clear, a little tune on a new level.
+    const clearing = this.state.clearing !== null && this.state.clearing !== undefined;
+    if (this.state.level > this.lastLevel) this.ctx.sound('level');
+    else if (clearing && !this.sawClearing) this.ctx.sound('good');
+    this.sawClearing = clearing;
+    this.lastLevel = this.state.level;
   }
 
   render(r: Renderer): void {

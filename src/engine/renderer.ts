@@ -31,6 +31,7 @@ export interface Ctx2D {
   fill(): void;
   stroke(): void;
   fillText(text: string, x: number, y: number): void;
+  measureText(text: string): { width: number };
   imageSmoothingEnabled: boolean;
   drawImage(image: CanvasImageSource, dx: number, dy: number, dw: number, dh: number): void;
 }
@@ -164,6 +165,11 @@ export class CanvasChannelRenderer implements Renderer {
     for (let i = 2; i + 1 < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
     ctx.closePath();
     this.paint(ch, o);
+  }
+
+  measure(s: string, o?: TextOpts): number {
+    this.ctx.font = `${o?.bold ? '700 ' : ''}${o?.size ?? 16}px ${UI_FONT}`;
+    return this.ctx.measureText(s).width;
   }
 
   text(ch: Channel, s: string, x: number, y: number, o?: TextOpts): void {

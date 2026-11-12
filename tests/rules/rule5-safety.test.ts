@@ -272,7 +272,8 @@ describe('rule 5: safety', () => {
             current.dispose();
             const report = analyseFlashing(series, 60);
             expect(report, `worst window starts at frame ${report.worstAt}`).toMatchObject({ ok: true });
-          });
+            // 3,600 recorded frames per game: allow time on a slow or busy machine.
+          }, 30_000);
         }
       }
     }

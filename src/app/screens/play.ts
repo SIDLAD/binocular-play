@@ -94,6 +94,8 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
   /** The same, minus idle stretches. */
   let roundActiveMs = 0;
   let media: VideoMedia | null = null;
+  /** Text pasted for a reading mode. Never saved. */
+  let pasted: string | null = null;
   // Depth tasks show both eyes at full brightness (see resolvePalette).
   const stereoPalette = def.eyeMode === 'stereo' ? createLivePalette(app.store, { fullFellow: true }) : null;
   const palette = stereoPalette ?? app.palette;
@@ -122,6 +124,7 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
       saved: p?.gameProgress[def.id] ?? null,
       display: { pxPerDegree: d.pxPerDegree, devicePxPerDegree: d.devicePxPerDegree, measured: d.measured },
       media,
+      text: pasted,
       weakEyeSide: p?.vision.weakEye ?? 'left',
       sound: (kind) => {
         if (app.store.activeProfile?.ui.sound) playTone(kind);
@@ -226,6 +229,10 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
       showVideoPicker(chosen);
       return;
     }
+    if (chosenMode?.needsText && !pasted) {
+      showTextPicker(chosen);
+      return;
+    }
     endRound('quit');
     mode = chosen;
     shell.restart(context());
@@ -246,6 +253,40 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
     setLayer(null);
     media?.play();
     shell.start();
+  };
+
+  /** Asks for text to read. It stays in memory for this visit only. */
+  const showTextPicker = (chosen: string) => {
+    const area = h('textarea', { rows: 8, maxLength: 20000, placeholder: 'Paste or type the text you want to read', 'aria-label': 'Text to read', 'data-testid': 'pasted-text' });
+    setLayer(
+      h(
+        'div',
+        { class: 'overlay' },
+        h(
+          'div',
+          { class: 'dialog', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Your own text', 'data-testid': 'text-picker' },
+          h('h2', null, 'Your own text'),
+          h('p', null, 'Paste something you want to read. It stays on this device and is not saved: it is gone when you leave this page.'),
+          area,
+          h(
+            'div',
+            { class: 'row' },
+            button(
+              'Start reading',
+              () => {
+                const text = area.value.trim();
+                if (text === '') return;
+                pasted = text.slice(0, 20000);
+                begin(chosen);
+              },
+              'primary',
+              { 'data-testid': 'start-reading' },
+            ),
+            button('Back', showStart, 'plain'),
+          ),
+        ),
+      ),
+    );
   };
 
   /** Asks for a video file. It is played from this device only and never stored. */
@@ -426,7 +467,8 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
       el.addEventListener('contextmenu', (e) => e.preventDefault());
       return el;
     };
-    const moving = def.touchButtons.filter((b) => b.action === 'left' || b.action === 'right' || b.action === 'down');
+    const isMove = (b: (typeof def.touchButtons)[number]) => b.group === 'move' || (b.group === undefined && (b.action === 'left' || b.action === 'right' || b.action === 'down'));
+    const moving = def.touchButtons.filter(isMove);
     const acting = def.touchButtons.filter((b) => !moving.includes(b));
     touch = h('div', { class: 'touch' }, h('div', { class: 'group move' }, ...moving.map(make)), h('div', { class: 'group act' }, ...acting.map(make)));
   }

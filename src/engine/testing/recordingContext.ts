@@ -135,6 +135,12 @@ export class RecordingContext implements Ctx2D {
     this.record('text', this.fillStyle, text.length * size * size * 0.25);
   }
 
+  /** About half an em per character: close enough for layout in tests. */
+  measureText(text: string): { width: number } {
+    const size = parseFloat(/(\d+(?:\.\d+)?)px/.exec(this.font)?.[1] ?? '10');
+    return { width: text.length * size * 0.55 };
+  }
+
   /**
    * Images are the pattern and video primitives. Their stand-in bitmap carries the channel
    * colour (`peak`) and the share of that colour's light it carries (`coverage`), so the

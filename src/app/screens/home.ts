@@ -1,7 +1,9 @@
-import { secondsOnDay, currentStreak } from '../../core/progress/sessionLog';
+import { activeSecondsOnDay, weekStreak, weekSummary } from '../../core/progress/sessionLog';
+import type { GameDefinition } from '../../engine/api';
+import { evidenceBadgeLabel } from '../components/badges';
 import { isBlockedToday, localDay } from '../../core/safety/guards';
 import { formatClock, remainingMs } from '../../core/safety/session';
-import { gamesFor } from '../gameList';
+import { GROUPS, eyeTag, gamesFor, todaysPick } from '../gameList';
 import { balanceDue } from './balance';
 import { drawAvatar } from '../components/art';
 import { channelCanvas } from '../components/channelCanvas';
@@ -16,8 +18,10 @@ export const homeScreen: Screen = (app, _params, scope) => {
 
   const avatar = channelCanvas(app.palette, scope, { width: 32, height: 32, className: 'avatar', draw: (r) => drawAvatar(r, profile.avatar) });
   const session = app.session.peek(profile.id, now.getTime());
-  const minutesToday = Math.round(secondsOnDay(profile, localDay(now)) / 60);
-  const streak = currentStreak(profile, now);
+  const minutesToday = Math.round(activeSecondsOnDay(profile, localDay(now)) / 60);
+  const week = weekSummary(profile, now);
+  const weeks = weekStreak(profile, now);
+  const adult = profile.kind === 'adult';
 
   const notices: HTMLElement[] = [];
   if (isBlockedToday(profile, now)) {
@@ -64,25 +68,31 @@ export const homeScreen: Screen = (app, _params, scope) => {
   }
 
   const games = gamesFor(profile);
-  const tiles =
-    games.length === 0
-      ? h('div', { class: 'card' }, h('p', null, 'The first game is on its way.'))
-      : h(
-          'div',
-          { class: 'tiles' },
-          ...games.map((g) => {
-            const icon = channelCanvas(app.palette, scope, { width: 240, height: 150, draw: (r) => g.icon(r) });
-            const best = profile.progress.best[g.id];
-            return h(
-              'a',
-              { class: 'tile', href: `#/play/${g.id}`, 'data-testid': `tile-${g.id}` },
-              icon.el,
-              h('strong', null, g.title),
-              h('span', { class: 'small muted' }, g.blurb),
-              best ? h('span', { class: 'small' }, `Best: ${best}`) : null,
-            );
-          }),
-        );
+  const tile = (g: GameDefinition, testId = `tile-${g.id}`) => {
+    const icon = channelCanvas(app.palette, scope, { width: 240, height: 150, draw: (r) => g.icon(r) });
+    const best = profile.progress.best[g.id];
+    return h(
+      'a',
+      { class: 'tile', href: `#/play/${g.id}`, 'data-testid': testId },
+      icon.el,
+      h('strong', null, g.title),
+      h('span', { class: 'small muted' }, g.blurb),
+      h('span', { class: 'tags' }, h('span', { class: 'badge' }, eyeTag(g.eyeMode)), h('span', { class: 'badge' }, evidenceBadgeLabel(g.evidence.badge))),
+      best ? h('span', { class: 'small' }, `Best: ${best}`) : null,
+    );
+  };
+  const pick = todaysPick(games, now);
+  const sections = GROUPS.map((group) => {
+    const list = games.filter((g) => g.group === group.id);
+    if (list.length === 0) return null;
+    return h(
+      'section',
+      { 'data-testid': `group-${group.id}` },
+      h('h2', null, group.title),
+      h('p', { class: 'small muted' }, group.blurb),
+      h('div', { class: 'tiles' }, ...list.map((g) => tile(g))),
+    );
+  });
 
   return h(
     'div',
@@ -92,27 +102,40 @@ export const homeScreen: Screen = (app, _params, scope) => {
       { class: 'topbar' },
       h('span', { class: 'brand' }, 'Binocular Play'),
       h('span', { class: 'spacer' }),
-      h('a', { href: '#/profiles', class: 'btn btn-plain btn-small row', 'aria-label': `Player: ${profile.name}. Change player.` }, avatar.el, h('span', null, profile.name)),
+      h('a', { href: '#/profiles', class: 'btn btn-plain btn-small row', 'aria-label': `Player: ${profile.name}. Change player.` }, adult ? null : avatar.el, h('span', null, profile.name)),
     ),
     h(
       'main',
       null,
-      h('h1', null, `Hi ${profile.name}! Glasses on?`),
+      h('h1', null, adult ? `Glasses on, ${profile.name}?` : `Hi ${profile.name}! Glasses on?`),
       ...notices,
       h(
         'div',
         { class: 'stats' },
-        h('div', { class: 'stat' }, h('b', null, `${minutesToday} min`), h('span', { class: 'small muted' }, 'played today')),
+        h('div', { class: 'stat' }, h('b', null, `${minutesToday} min`), h('span', { class: 'small muted' }, 'active today')),
+        h(
+          'div',
+          { class: 'stat', 'data-testid': 'weekly-goal' },
+          h('b', null, `${Math.min(week.goalDays, profile.goal.daysPerWeek)} of ${profile.goal.daysPerWeek} days`),
+          h('span', { class: 'small muted' }, `this week’s goal (${profile.goal.minutesPerDay} min a day)`),
+        ),
         h(
           'div',
           { class: 'stat' },
           h('b', null, formatClock(remainingMs(profile.session.lengthMin, session))),
           h('span', { class: 'small muted' }, 'left before a break'),
         ),
-        h('div', { class: 'stat' }, h('b', null, streak === 1 ? '1 day' : `${streak} days`), h('span', { class: 'small muted' }, 'in a row')),
+        h('div', { class: 'stat' }, h('b', null, weeks === 1 ? '1 week' : `${weeks} weeks`), h('span', { class: 'small muted' }, 'goal met in a row')),
       ),
-      h('h2', null, 'Games'),
-      tiles,
+      pick
+        ? h(
+            'section',
+            { class: 'today', 'data-testid': 'todays-pick' },
+            h('h2', null, 'Today’s pick'),
+            h('div', { class: 'tiles' }, tile(pick, 'pick-tile')),
+          )
+        : h('div', { class: 'card' }, h('p', null, 'No activities are available for this player.')),
+      ...sections,
       h(
         'nav',
         { class: 'nav-links', 'aria-label': 'More' },

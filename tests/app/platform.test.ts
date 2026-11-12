@@ -224,3 +224,50 @@ describe('Depth Duel and eye turns, in the real app', () => {
     expect(byTestId(t.root, 'hidden-for-eye-turn').textContent).toContain('switched off');
   });
 });
+
+describe('home: motivation and grouping (3c)', () => {
+  it('today’s pick changes from day to day and stays the same all day', async () => {
+    const { todaysPick } = await import('../../src/app/gameList');
+    const { GAMES } = await import('../../src/games/registry');
+    const a = todaysPick(GAMES, new Date(2026, 10, 12, 8));
+    const b = todaysPick(GAMES, new Date(2026, 10, 12, 22));
+    const c = todaysPick(GAMES, new Date(2026, 10, 13, 8));
+    expect(a?.id).toBe(b?.id);
+    expect(a?.id).not.toBe(c?.id);
+    const seen = new Set<string>();
+    for (let d = 0; d < GAMES.length; d++) seen.add(todaysPick(GAMES, new Date(2026, 10, 1 + d, 12))?.id ?? '');
+    expect(seen.size).toBe(GAMES.length);
+  });
+
+  it('home shows the groups, today’s pick, the weekly goal and tile badges', () => {
+    t = startApp();
+    addReadyProfile(t.app, 'adult');
+    t.app.navigate('/');
+    for (const g of ['training', 'watch', 'games', 'reading']) expect(t.root.querySelector(`[data-testid="group-${g}"]`)).not.toBeNull();
+    expect(byTestId(t.root, 'todays-pick').querySelector('[data-testid="pick-tile"]')).not.toBeNull();
+    expect(byTestId(t.root, 'weekly-goal').textContent).toContain('of 5 days');
+    expect(byTestId(t.root, 'tile-letter-crowd').textContent).toContain('Weaker eye only');
+    expect(byTestId(t.root, 'tile-split-lines').textContent).toContain('Not tested');
+    expect(t.root.querySelector('h1')?.textContent).toBe('Glasses on, Sam?');
+  });
+
+  it('a child profile keeps the friendly greeting', () => {
+    t = startApp();
+    addReadyProfile(t.app, 'child');
+    t.app.navigate('/');
+    expect(t.root.querySelector('h1')?.textContent).toBe('Hi Sam! Glasses on?');
+  });
+
+  it('“Your own text” asks for text first and keeps it out of storage', async () => {
+    t = startApp();
+    const id = addReadyProfile(t.app, 'adult');
+    t.app.session.passCheck(id, NOW.getTime());
+    t.app.navigate('/play/split-lines');
+    click(byTestId(t.root, 'mode-own'));
+    const area = byTestId(t.root, 'pasted-text') as HTMLTextAreaElement;
+    area.value = 'A very private sentence to read';
+    click(byTestId(t.root, 'start-reading'));
+    expect(t.root.querySelector('[data-testid="text-picker"]')).toBeNull();
+    expect(t.storage.getItem('binocular-play')).not.toContain('private sentence');
+  });
+});

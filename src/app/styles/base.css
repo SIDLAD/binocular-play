@@ -722,3 +722,24 @@ th {
   font-weight: 600;
   white-space: nowrap;
 }
+
+/* ---------- home groups ---------- */
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.today .tiles {
+  grid-template-columns: minmax(0, 360px);
+}
+.dialog textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  padding: 8px;
+  margin-bottom: 12px;
+}

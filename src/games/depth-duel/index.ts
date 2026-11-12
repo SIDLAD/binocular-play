@@ -20,7 +20,7 @@ export const depthDuel: GameDefinition = {
     note: 'Copies red-green anaglyph depth training (Xi 2014): in a small study of adults, depth perception improved a lot and acuity a little. A VR version (Vedamurthy 2016) found similar depth gains. Not offered to anyone who reported an eye turn or double vision.',
   },
   touchButtons: [
-    { action: 'up', label: '↑', name: 'Top is nearer' },
+    { action: 'up', label: '↑', name: 'Top is nearer', group: 'move' },
     { action: 'down', label: '↓', name: 'Bottom is nearer' },
   ],
   create: (ctx) => new DepthDuel(ctx),

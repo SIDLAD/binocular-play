@@ -116,6 +116,8 @@ export interface Renderer {
   poly(ch: Channel, pts: readonly number[], o?: DrawOpts): void;
   /** Text is centred vertically on y. */
   text(ch: Channel, s: string, x: number, y: number, o?: TextOpts): void;
+  /** Width in logical px that text() would take. */
+  measure(s: string, o?: TextOpts): number;
   group(transform: Transform, draw: () => void): void;
   /** A dithered grating or noise patch centred on (cx, cy). */
   pattern(ch: Channel, cx: number, cy: number, spec: PatternSpec, o?: { intensity?: number }): void;
@@ -158,6 +160,8 @@ export interface GameContext {
   display: DisplayInfo;
   /** The player's own video, for modes with `needsVideo`. */
   media: MediaSource | null;
+  /** Text the player pasted, for modes with `needsText`. Kept for this visit only. */
+  text: string | null;
   /**
    * Which side the weak eye is on. Not a colour: depth tasks need it to make a patch look
    * nearer (crossed disparity) rather than farther.
@@ -201,6 +205,8 @@ export interface TouchButton {
   label: string;
   /** Spoken name for screen readers. */
   name: string;
+  /** Which cluster it sits in. Default: left, right and down are 'move', the rest 'act'. */
+  group?: 'move' | 'act';
 }
 
 export interface GameMode {
@@ -209,6 +215,8 @@ export interface GameMode {
   blurb: string;
   /** The start card asks for a video file before this mode can start. */
   needsVideo?: boolean;
+  /** The start card asks the player to paste some text before this mode can start. */
+  needsText?: boolean;
   /** Shown with a warning, or hidden, when screening reported an eye turn or double vision. */
   riskyWithEyeTurn?: boolean;
 }
@@ -272,6 +280,7 @@ export function testGameContext(over: Partial<GameContext> = {}): GameContext {
     saved: null,
     display: { pxPerDegree: 40, devicePxPerDegree: 80, measured: false },
     media: null,
+    text: null,
     weakEyeSide: 'left',
     sound: () => {},
     ...over,

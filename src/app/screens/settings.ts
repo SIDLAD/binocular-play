@@ -121,6 +121,12 @@ export const settingsScreen: Screen = (app) =>
       contrastOut.textContent = `${contrast.value}%`;
     });
 
+    const soundTick = h('input', { type: 'checkbox', checked: profile.ui.sound, 'data-testid': 'sound' });
+    soundTick.addEventListener('change', () =>
+      app.store.updateActive((p) => {
+        p.ui.sound = soundTick.checked;
+      }),
+    );
     const breakTick = h('input', { type: 'checkbox', checked: profile.session.breakReminder });
     breakTick.addEventListener('change', () =>
       app.store.updateActive((p) => {
@@ -215,6 +221,7 @@ export const settingsScreen: Screen = (app) =>
           ),
         ),
         h('label', { class: 'check' }, breakTick, h('span', null, 'Show the break reminder')),
+        h('label', { class: 'check' }, soundTick, h('span', null, 'Soft sounds in games')),
       ),
       h(
         'div',

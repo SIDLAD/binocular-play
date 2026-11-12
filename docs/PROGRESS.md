@@ -8,29 +8,29 @@ Every session: read this first, and update it before finishing. See `docs/PROMPT
 | 0 Plan | **done**, approved by the user 2026-11-11 (`docs/PLAN.md`) |
 | 1 Foundation (settings, colours, onboarding, evidence pages) | **done** 2026-11-11 |
 | 2 First game (falling blocks, "Tumble Stack") | **done** 2026-11-12 |
-| 3 Evidence-based tasks (revised plan, `docs/PLAN-M3.md`) | in progress |
+| 3 Evidence-based tasks (revised plan, `docs/PLAN-M3.md`) | **done** 2026-11-12 |
 | 3a Platform: screen-size check, pattern/image primitives, staircase, active minutes, catch check, eyeMode, contrast policy | **done** 2026-11-12 |
 | 3b Adult tasks: Letter Crowd, Stripe Finder, Depth Duel, Watch mode (Quiet Reef + own video), Evidence page | **done** 2026-11-12 |
-| 3c Star Patrol, Glow Bounce, Split Lines, weekly goal, today's task, sounds, home grouping | in progress |
+| 3c Star Patrol, Glow Bounce, Split Lines, weekly goal, today's task, sounds, home grouping | **done** 2026-11-12 |
 | 4 Progress & polish (dashboard, PWA) | not started |
 | 5 Ship (CI, GitHub Pages, README) | not started |
 
 ## Next step
-Milestone 3 was re-planned on 2026-11-12 around the medical evidence (approved plan: `docs/PLAN-M3.md`; evidence: `docs/research/TASK-EVIDENCE.md`). Build in order:
+Milestone 3 is done (plan: `docs/PLAN-M3.md`; evidence: `docs/research/TASK-EVIDENCE.md`). Eight activities: Letter Crowd, Stripe Finder, Depth Duel (training); Watch (Quiet Reef or your own video); Star Patrol, Glow Bounce, Tumble Stack (games); Split Lines (reading).
 
-1. **3a platform pieces**: screen-size check (`core/display/visualAngle.ts`, device setting), `Renderer.pattern` (dithered gratings/noise), `Renderer.image` with complementary blob masks, shared staircase (`core/adaptive/staircase.ts`) with per-profile `gameProgress`, active-minute logging and catch accuracy, weak-eye catch targets, `GameDefinition.eyeMode` + `requiresNoEyeTurn`, contrast policy (+2 / −5, cap 80 %, hold).
-2. **3b adult tasks**: Letter Crowd, Stripe Finder, Depth Duel, Watch mode (Quiet Reef + local video), Evidence page Adults section.
-3. **3c**: Star Patrol, Glow Bounce, Split Lines, weekly goal + streak, today's task, WebAudio tones, home grouping with evidence badges.
+1. **The user's real-glasses test** (checklist at the bottom, now with Milestone 3 items). Fix what it finds first: the new tasks lean on calibration and on the screen-size check.
+2. **Watch the new tasks in a visible browser tab.** This session's preview pane was hidden, so no task was played in real time (see Known issues). Play one block of each and look at Stripe Finder's grating and Depth Duel's dots on screen.
+3. **Milestone 4** (`docs/PROMPT.md`): progress dashboard with charts and the doctor summary (use the new active minutes, trials and catch fields), PWA install and offline, persistent-storage request and export nudge.
 
-The snake-like game and Twin Peek matching are in the backlog. The flanked-Gabor task (Polat 2004) is not built (needs sub-8-bit contrast).
-Still waiting on the user: the real-glasses test (checklist at the bottom).
+Backlog: snake-like game and Twin Peek matching (no tested design behind them); flanked-Gabor task (Polat 2004, needs sub-8-bit contrast).
 
-What 3a added that games use (all through `engine/api`):
+What Milestone 3 added that games use (all through `engine/api`):
 - `GameDefinition.eyeMode` (`dichoptic` | `weakEyeOnly` | `stereo`), `group`, `evidence { badge, note }`, optional `requiresNoEyeTurn`, `usesVisualAngle`, `passive`; `GameMode.needsVideo`, `riskyWithEyeTurn`.
 - `GameContext.saved` / `Game.save()` (numbers only, kept in `profile.gameProgress[gameId]`), `ctx.display` (px per degree), `ctx.media` (the player's video), `ctx.sound(kind)`.
 - `GameStatus.catches`, `trials`, `targetMet` (logged per round; `targetMet` drives the optional contrast policy).
 - `Renderer.pattern(ch, cx, cy, spec)` (dithered grating/noise, cycles per degree), `Renderer.image(ch, src, x, y, w, h, mask, part)` (video or a game-drawn scene as luminance, split by complementary blob masks), `r.pxPerDegree`, `r.pixelRatio`.
-- `Staircase`, `CatchSchedule`, `randomBlobs` are exported from `engine/api`.
+- `Staircase`, `CatchSchedule`, `randomBlobs`, `testGameContext` are exported from `engine/api`.
+- `GameInput` `{ kind: 'key', key }` for letters; `ctx.weakEyeSide`; `ctx.text` with `GameMode.needsText`; `Renderer.measure(s, o)`; `TouchButton.group` ('move' | 'act').
 
 How to add a game (everything else comes for free):
 - Make `src/games/<id>/` with `logic.ts` (pure, tested), `game.ts` (implements `Game` from `src/engine/api.ts`) and `index.ts` (a `GameDefinition`). Copy the shape of `src/games/falling-blocks/`.
@@ -86,7 +86,18 @@ Rules from the user so far: do not push and do not add a git remote; update and 
 - 2026-11-12: Watch: blobs move every 10 s with a 1 s cross-fade; weak eye gets "inside" at full brightness, strong eye "outside" at the profile's contrast. A weak-eye-only star every 20–40 s is the catch check. Video stays an object URL, freed when the screen closes. (Opus 5.5)
 - 2026-11-12: Evidence page: Adults section rewritten (monocular vs dichoptic split, hours, BRAVO null at home, "results vary; none tested this app") and a new "Where each activity comes from" section with "what the studies used" doses. (Opus 5.5)
 
+- 2026-11-12: Star Patrol: the cave and ship go to the strong eye, enemies, pickups, shields and gate stripes to the weak eye. Gate stripes run a 3-down-1-up contrast staircase and count as the catch check; enemy speed/rate adapt every 10 enemies (> 80 % destroyed: ×1.06, < 70 %: ×0.94). Shots fire on their own about 3 times a second; hits fade out over 300 ms (no flashes). (Opus 5.5)
+- 2026-11-12: Glow Bounce: ball, paddle and lives to the weak eye, bricks to the strong eye, walls to both (Dig Rush split). A lost ball makes it 10 % slower and 8 % wider; a cleared wall 8 % faster and 4 % narrower; saved per profile. Auto-launch after 3 s. (Opus 5.5)
+- 2026-11-12: Split Lines: words alternate eyes across the whole text; three short original passages written for the app (no third-party text), or pasted text kept in memory only. Font 16–48 px (saved). Marked passive, so reading without pressing still counts as active. Background lightness is the existing Settings → Background, not a per-game control. (Opus 5.5)
+- 2026-11-12: Home: "Today's pick" rotates by calendar day through the games this player may see; groups Training / Watch / Games / Reading; each tile shows an eye tag and the evidence badge. Stats: active minutes today, goal days this week (goal set on the grown-ups page), weeks in a row with the goal met. (Opus 5.5)
+- 2026-11-12: Adult theme: adult profiles get no cartoon avatar in the top bar and a plain greeting ("Glasses on, Sam?"). Settings and the grown-ups page were already ungated for adults. Sound on/off is now in Settings → Play time; Tumble Stack also plays tones on a cleared row and a new level. (Opus 5.5)
+- 2026-11-12: The 60-second flash tests got a 30 s timeout; Letter Crowd's many stroke segments took over 5 s on a busy run. (Opus 5.5)
+
 ## Known issues / TODOs
+- **No task was played in real time in a browser this session** (pane hidden, no animation frames). Verified in the browser: start cards, first frames, canvas colours per channel, layouts at three sizes, video loading, home and grown-ups pages. Not verified in the browser: timing (150 ms letters, 400 ms gratings), staircases moving, gate passes, ball physics, page turns, idle detection, catches. All of these have unit tests.
+- Star Patrol's "gates appear every 20–40 s" test only checks the count when the ship survives two minutes without steering, which it may not.
+- The Depth Duel intro card cannot be skipped with the keyboard until 0.8 s have passed (stops an accidental tap); it moves on by itself after 3 s.
+- Split Lines' own-text mode loses the text on "Play again" after a reload of the page (by design: it is never stored).
 - In a hidden preview pane the play canvas only resizes on a window `resize` event (animation frames and ResizeObserver do not run). Not a bug in a visible tab, but layouts in this session were checked by firing `resize` by hand.
 - Stripe Finder's grating and Depth Duel's dots were checked in the browser only as first frames (pane hidden); the dithered grating itself is covered by unit tests, not looked at on screen.
 - Browser checks in this session ran with the preview pane hidden, so animation frames did not run: real-time play (rounds, idle detection, catches) was not watched in the browser. Unit/jsdom tests cover the timing logic.
@@ -127,7 +138,9 @@ Rules from the user so far: do not push and do not add a git remote; update and 
 
 - 2026-11-12, Opus 5.5: Milestone 3 re-plan landed (`docs/PLAN-M3.md`, `docs/research/TASK-EVIDENCE.md`). Built 3a: visual-angle maths and screen-size check, dithered pattern and masked image primitives, staircase, catch schedule, contrast policy + balance check, active minutes, catch/trial logging, weekly goal data, eyeMode-aware rule 3 test, eye-turn hiding. 319 tests pass; lint and build clean. Browser: screen-size check saves per device; start card shows the evidence badge; grown-ups page shows active minutes, goal and contrast log; settings, display and balance pages fit at 375×812 and 812×375 with no horizontal scroll; no console errors.
 
-- 2026-11-12, Opus 5.5: Milestone 3b. Letter Crowd, Stripe Finder, Depth Duel and Watch (Quiet Reef + your own video), Evidence page Adults and "Where each activity comes from". 371 tests pass; lint and build clean. Browser (pane hidden, so first frames only): start cards show the evidence badge and the sit-this-far note; canvas pixels: Letter Crowd and Stripe Finder red + grey only, Depth Duel red + cyan with cyan at 255 while the profile is at 30 %, Watch weak-eye red up to 254 and strong-eye cyan ≤ 144; a generated local video loaded through the picker and was drawn split between the eyes; every task fits at 375×812 and 812×375 with no horizontal scroll; no console errors.
+- 2026-11-12, Opus 5.5: Milestone 3b. Letter Crowd, Stripe Finder, Depth Duel and Watch (Quiet Reef + your own video), Evidence page Adults and "Where each activity comes from". 358 tests pass; lint and build clean. Browser (pane hidden, so first frames only): start cards show the evidence badge and the sit-this-far note; canvas pixels: Letter Crowd and Stripe Finder red + grey only, Depth Duel red + cyan with cyan at 255 while the profile is at 30 %, Watch weak-eye red up to 254 and strong-eye cyan ≤ 144; a generated local video loaded through the picker and was drawn split between the eyes; every task fits at 375×812 and 812×375 with no horizontal scroll; no console errors.
+
+- 2026-11-12, Opus 5.5: Milestone 3c. Star Patrol, Glow Bounce, Split Lines; home grouping, today's pick, weekly goal and week streak, eye tags and evidence badges on tiles; adult theme; sound toggle; touch-button groups. 385 tests pass (twice in a row); lint and build clean. Browser (pane hidden, first frames only): every new game draws only in its channels (strong eye ≤ 149 at 30 %), fits at 375×812 and 812×375 with no horizontal scroll, touch buttons group as expected; home shows four groups, today's pick and the goal; no console errors. Milestone 3 complete. Nothing pushed; no remote.
 
 ## Real-glasses checklist for the user
 Run `npm run dev`, open http://localhost:5173, clear site data first if you want the first-run flow.
@@ -140,3 +153,14 @@ Run `npm run dev`, open http://localhost:5173, clear site data first if you want
 7. On a phone: are the buttons big enough, and do drag, tap-to-turn and flick-down feel right?
 8. Try red/blue or red/green glasses if you have them, and say which colours leak.
 9. Anything that flickers, hurts or looks double: stop, and tell me what was on screen.
+
+Milestone 3 additions (do the screen-size check first: Settings → Screen size):
+10. Screen-size check: does the box really match your card (or 8.56 cm / 5.4 cm on a ruler)? Is the "sit this far" distance on each training task's start card about right for how you sit?
+11. Letter Crowd and Stripe Finder, stronger eye covered: you should see the letters / stripes. Weaker eye covered: they should vanish, leaving only the grey frame and buttons. Is a 150 ms letter readable at all at first? Do the faintest stripes still look like stripes and not like noise or banding?
+12. Stripe Finder Push mode (only shown after two clear "no" safety answers): is the grey noise over the stripes comfortable?
+13. Depth Duel: with both eyes open, does one square look nearer or farther than the other? Does "nearer" match what the game says? Any double vision or strain: stop and tell me.
+14. Watch (Quiet Reef, then a video of your own): is the dimmed picture comfortable to watch for a few minutes? Do the soft patches moving every 10 seconds bother you? Can you see the star with only the weaker eye?
+15. Star Patrol: can you see the striped gate windows and tell which way they lean? Is the cave too bright or too dim?
+16. Glow Bounce: can you follow the ball with both eyes open? Weaker eye covered, the ball and paddle should vanish.
+17. Split Lines: can you read a whole line with both eyes open? With one eye covered, every other word should vanish.
+18. Any task: anything that flickers, swims or looks double: stop, and say which task and what was on screen.
