@@ -69,7 +69,7 @@ export class TumbleStack implements Game {
 
   input(e: GameInput): void {
     if (e.kind === 'action') this.action(e.action, e.pressed);
-    else this.pointer(e.phase, e.x, e.y);
+    else if (e.kind === 'pointer') this.pointer(e.phase, e.x, e.y);
   }
 
   private action(action: GameAction, pressed: boolean): void {

@@ -220,14 +220,20 @@ export class CanvasChannelRenderer implements Renderer {
     if (w <= 0 || h <= 0) return;
     const p = this.palette.current;
     const scale = Math.min(1, IMAGE_MAX_SIDE / Math.max(w, h)) * Math.min(this.pixelRatio, 2);
-    const iw = Math.max(1, Math.round(w * scale));
-    const ih = Math.max(1, Math.round(h * scale));
+    let iw = Math.max(1, Math.round(w * scale));
+    let ih = Math.max(1, Math.round(h * scale));
     const lumaKey = `${src.id}|${iw}x${ih}|${this.frame}`;
     if (!this.lumaCache || this.lumaCache.key !== lumaKey) {
       this.lumaCache = { key: lumaKey, luma: this.surfaces.luma(src, iw, ih) };
     }
-    // Without a canvas to read (tests), a flat mid-grey picture keeps the masks testable.
-    const luma = this.lumaCache.luma ?? new Float32Array(iw * ih).fill(0.5);
+    let luma = this.lumaCache.luma;
+    if (!luma) {
+      // No canvas to read (tests): a coarse, flat mid-grey picture keeps the masks testable.
+      const k = 64 / Math.max(iw, ih);
+      iw = Math.max(1, Math.round(iw * k));
+      ih = Math.max(1, Math.round(ih * k));
+      luma = new Float32Array(iw * ih).fill(0.5);
+    }
     const a = this.mask(mask.from, iw, ih);
     const b = this.mask(mask.to, iw, ih);
     const out = new Uint8ClampedArray(iw * ih * 4);

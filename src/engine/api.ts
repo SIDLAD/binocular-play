@@ -130,6 +130,8 @@ export type GameAction = 'left' | 'right' | 'up' | 'down' | 'primary' | 'seconda
 
 export type GameInput =
   | { kind: 'action'; action: GameAction; pressed: boolean }
+  /** A letter key A–Z, sent as well as any action the key maps to. */
+  | { kind: 'key'; key: string }
   | { kind: 'pointer'; phase: 'down' | 'move' | 'up'; x: number; y: number };
 
 /** Saved difficulty and progress for one game, kept per profile. Numbers only. */
@@ -156,6 +158,11 @@ export interface GameContext {
   display: DisplayInfo;
   /** The player's own video, for modes with `needsVideo`. */
   media: MediaSource | null;
+  /**
+   * Which side the weak eye is on. Not a colour: depth tasks need it to make a patch look
+   * nearer (crossed disparity) rather than farther.
+   */
+  weakEyeSide: 'left' | 'right';
   /** Gentle feedback tones. The app mutes them when sound is off. */
   sound(kind: SoundKind): void;
 }
@@ -252,6 +259,22 @@ export function seededRng(seed: number): () => number {
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** A GameContext for tests: seeded, silent, estimated display, no saved progress. */
+export function testGameContext(over: Partial<GameContext> = {}): GameContext {
+  return {
+    rng: seededRng(7),
+    startLevel: 1,
+    reducedMotion: true,
+    mode: 'default',
+    saved: null,
+    display: { pxPerDegree: 40, devicePxPerDegree: 80, measured: false },
+    media: null,
+    weakEyeSide: 'left',
+    sound: () => {},
+    ...over,
   };
 }
 

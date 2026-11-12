@@ -10,8 +10,8 @@ Every session: read this first, and update it before finishing. See `docs/PROMPT
 | 2 First game (falling blocks, "Tumble Stack") | **done** 2026-11-12 |
 | 3 Evidence-based tasks (revised plan, `docs/PLAN-M3.md`) | in progress |
 | 3a Platform: screen-size check, pattern/image primitives, staircase, active minutes, catch check, eyeMode, contrast policy | **done** 2026-11-12 |
-| 3b Adult tasks: Letter Crowd, Stripe Finder, Depth Duel, Watch mode (Quiet Reef + own video), Evidence page | in progress |
-| 3c Star Patrol, Glow Bounce, Split Lines, weekly goal, today's task, sounds, home grouping | not started |
+| 3b Adult tasks: Letter Crowd, Stripe Finder, Depth Duel, Watch mode (Quiet Reef + own video), Evidence page | **done** 2026-11-12 |
+| 3c Star Patrol, Glow Bounce, Split Lines, weekly goal, today's task, sounds, home grouping | in progress |
 | 4 Progress & polish (dashboard, PWA) | not started |
 | 5 Ship (CI, GitHub Pages, README) | not started |
 
@@ -79,7 +79,16 @@ Rules from the user so far: do not push and do not add a git remote; update and 
 - 2026-11-12: Screen-size check (`#/display`) is per device. Narrow screens (< 600 px) match the card's short edge (53.98 mm), because a card is wider than a phone. Until it is done, sizes use estimates (3.8 px/mm desktop, 6.3 px/mm phone; 60 / 50 cm). (Opus 5.5)
 - 2026-11-12: Weekly goal (default 5 days × 20 min) lives in the profile and is set on the grown-ups page; home display is 3c. (Opus 5.5)
 
+- 2026-11-12: `GameInput` gained `{ kind: 'key', key }` for letter keys A–Z (sent as well as any action the key maps to), and `GameContext.weakEyeSide` (not a colour) so Depth Duel can make a patch nearer with crossed disparity. `testGameContext()` lives in `engine/api` so game tests can use it under rule 1. (Opus 5.5)
+- 2026-11-12: Letter Crowd: own stroke letters (C D H K N O R S V Z on a 5×5 grid), 4 flankers, spacing staircase 3-down-1-up ×0.92 from 2× to touching, letters shrink 10 % after a block at ≤ 1.2× spacing with ≥ 70 % right (grow 10 % if ≥ 2.3× with < 60 %). Target 300 ms for the first two blocks, then 150 ms; Relaxed is untimed and 1.5× larger. Start size 60 arcmin (deliberately large). Four weak-eye dots are always on screen so the rule 3 test (and the eye) always has a weak-eye target. (Opus 5.5)
+- 2026-11-12: Stripe Finder: first block finds the training frequency with a 3-down-1-up staircase on stripe period at 0.5 contrast; later blocks run the contrast staircase (×0.9 / ×1.1) at that frequency and nudge it ±10 % to stay near the cut-off. Capped at 4 device px per cycle. Push mode (noise for the strong eye) is hidden after a risky screening answer. (Opus 5.5)
+- 2026-11-12: Depth Duel: random-dot patches; only the weak eye's copy of the nearer patch moves, by whole device pixels (2-down-1-up, ×0.9 / ×1.1, 1–24 px); each patch also jitters sideways by the same amount in both eyes to hide position cues. Starts with a 3-second "if anything looks double, stop" card. (Opus 5.5)
+- 2026-11-12: Watch: blobs move every 10 s with a 1 s cross-fade; weak eye gets "inside" at full brightness, strong eye "outside" at the profile's contrast. A weak-eye-only star every 20–40 s is the catch check. Video stays an object URL, freed when the screen closes. (Opus 5.5)
+- 2026-11-12: Evidence page: Adults section rewritten (monocular vs dichoptic split, hours, BRAVO null at home, "results vary; none tested this app") and a new "Where each activity comes from" section with "what the studies used" doses. (Opus 5.5)
+
 ## Known issues / TODOs
+- In a hidden preview pane the play canvas only resizes on a window `resize` event (animation frames and ResizeObserver do not run). Not a bug in a visible tab, but layouts in this session were checked by firing `resize` by hand.
+- Stripe Finder's grating and Depth Duel's dots were checked in the browser only as first frames (pane hidden); the dithered grating itself is covered by unit tests, not looked at on screen.
 - Browser checks in this session ran with the preview pane hidden, so animation frames did not run: real-time play (rounds, idle detection, catches) was not watched in the browser. Unit/jsdom tests cover the timing logic.
 - Reloading or closing the tab in the middle of a round loses that round's log entry (session time is kept). A `pagehide` handler could save it.
 - Touch gestures on the canvas (drag, tap, flick) are covered by the flash test's random pointer input but were not tried with a real finger. The on-screen buttons were only checked for layout.
@@ -117,6 +126,8 @@ Rules from the user so far: do not push and do not add a git remote; update and 
 - 2026-11-12, Opus 5.5: progress check against the original "Amblyopia game with red/blue glasses" chat: Milestones 1–2 match the user's stated requirements (gaps that are on the plan: hosting, README, Playwright smoke test, auto-contrast UI). Fast-forwarded `main` to the Milestones 1–2 branch at the user's request. Added the "enough on its own?" box to the Other treatments page. 277 tests pass; lint and build clean; checked the page in the browser.
 
 - 2026-11-12, Opus 5.5: Milestone 3 re-plan landed (`docs/PLAN-M3.md`, `docs/research/TASK-EVIDENCE.md`). Built 3a: visual-angle maths and screen-size check, dithered pattern and masked image primitives, staircase, catch schedule, contrast policy + balance check, active minutes, catch/trial logging, weekly goal data, eyeMode-aware rule 3 test, eye-turn hiding. 319 tests pass; lint and build clean. Browser: screen-size check saves per device; start card shows the evidence badge; grown-ups page shows active minutes, goal and contrast log; settings, display and balance pages fit at 375×812 and 812×375 with no horizontal scroll; no console errors.
+
+- 2026-11-12, Opus 5.5: Milestone 3b. Letter Crowd, Stripe Finder, Depth Duel and Watch (Quiet Reef + your own video), Evidence page Adults and "Where each activity comes from". 371 tests pass; lint and build clean. Browser (pane hidden, so first frames only): start cards show the evidence badge and the sit-this-far note; canvas pixels: Letter Crowd and Stripe Finder red + grey only, Depth Duel red + cyan with cyan at 255 while the profile is at 30 %, Watch weak-eye red up to 254 and strong-eye cyan ≤ 144; a generated local video loaded through the picker and was drawn split between the eyes; every task fits at 375×812 and 812×375 with no horizontal scroll; no console errors.
 
 ## Real-glasses checklist for the user
 Run `npm run dev`, open http://localhost:5173, clear site data first if you want the first-run flow.

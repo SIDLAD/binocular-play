@@ -1,4 +1,5 @@
 import {
+  ACTIVITIES,
   ADULTS,
   ENOUGH_ON_ITS_OWN,
   EXERCISES_NOTE,
@@ -36,6 +37,13 @@ export const evidenceScreen: Screen = () =>
       h('div', { class: 'notice' }, h('h2', null, 'The honest summary'), h('ul', null, ...SUMMARY.map((s) => h('li', null, s)))),
       h('section', { id: 'negative', 'data-testid': 'negative-trials' }, h('h2', null, 'Trials where games like these did not do well'), ...NEGATIVE.map(item)),
       h('section', { id: 'positive' }, h('h2', null, 'Trials with positive results'), ...POSITIVE.map(item), item(ADULTS)),
+      h(
+        'section',
+        { id: 'activities', 'data-testid': 'activities' },
+        h('h2', null, 'Where each activity comes from'),
+        h('p', null, 'Each activity copies the design of a published study. That is not the same as being tested: this app has not been. Levels in the training tasks are training levels, not eye tests.'),
+        ...ACTIVITIES.map(item),
+      ),
       h('section', null, h('h2', null, 'Why engagement matters'), item(LESSON)),
       h('section', { id: 'safety' }, h('h2', null, 'Safety'), item(SAFETY_POINTS)),
       h('p', null, link('Other treatments your eye doctor may use', '#/treatments', 'btn btn-plain')),

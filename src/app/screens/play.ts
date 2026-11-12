@@ -122,6 +122,7 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
       saved: p?.gameProgress[def.id] ?? null,
       display: { pxPerDegree: d.pxPerDegree, devicePxPerDegree: d.devicePxPerDegree, measured: d.measured },
       media,
+      weakEyeSide: p?.vision.weakEye ?? 'left',
       sound: (kind) => {
         if (app.store.activeProfile?.ui.sound) playTone(kind);
       },

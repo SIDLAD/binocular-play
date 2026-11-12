@@ -37,7 +37,7 @@ describe('copy rules', () => {
   });
 
   it('every evidence item has at least one https source', () => {
-    const items = [...evidence.POSITIVE, ...evidence.NEGATIVE, evidence.LESSON, evidence.ADULTS, evidence.SAFETY_POINTS];
+    const items = [...evidence.POSITIVE, ...evidence.NEGATIVE, ...evidence.ACTIVITIES, evidence.LESSON, evidence.ADULTS, evidence.SAFETY_POINTS];
     expect(evidence.NEGATIVE.length).toBeGreaterThanOrEqual(3);
     for (const item of items) {
       expect(item.sources.length, item.title).toBeGreaterThan(0);

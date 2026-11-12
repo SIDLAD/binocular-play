@@ -22,6 +22,10 @@ function isTyping(target: EventTarget | null): boolean {
 export function bindKeyboard(send: (e: GameInput) => void, enabled: () => boolean): () => void {
   const down = new Set<GameAction>();
   const onDown = (e: KeyboardEvent) => {
+    const letter = /^Key([A-Z])$/.exec(e.code);
+    if (letter && !e.repeat && enabled() && !isTyping(e.target) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      send({ kind: 'key', key: letter[1] });
+    }
     const action = KEYS[e.code];
     if (!action || !enabled() || isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
     // A focused button would also "click" on space or enter: the game owns these keys while playing.

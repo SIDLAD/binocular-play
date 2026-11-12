@@ -124,13 +124,79 @@ export const LESSON: EvidenceItem = {
 };
 
 export const ADULTS: EvidenceItem = {
-  title: 'Adults',
+  title: 'Adults and teenagers',
   points: [
-    'A 2025 meta-analysis pooled 22 randomized trials of perceptual learning and video game training in adults, 422 people in total, and found an improvement in visual acuity.',
-    'The individual trials were small, and none of them tested this app.',
+    'A 2025 meta-analysis pooled 22 studies of perceptual learning and video-game training in adults, 422 people in total, and found that acuity improved on average.',
+    'Training the weaker eye on its own ("monocular" training, like Letter Crowd and Stripe Finder here) did best in that analysis. Two-eye ("dichoptic") training also helped, but less.',
+    'More hours of training went with bigger gains. Most of the studies were small, some very small, and most training was done in a lab with supervision.',
+    'At home it has gone less well: a randomized trial of a falling-blocks game in teenagers and adults at home (BRAVO) found it no better than a placebo game.',
+    'Results vary a lot between people. None of these studies tested this app.',
   ],
-  sources: [{ label: 'Ming et al., Ophthalmol Ther 2025 (PubMed 40146483)', url: 'https://pubmed.ncbi.nlm.nih.gov/40146483/' }],
+  sources: [
+    { label: 'Ming et al., Ophthalmol Ther 2025 (PubMed 40146483)', url: 'https://pubmed.ncbi.nlm.nih.gov/40146483/' },
+    { label: 'Tsirlin et al., IOVS 2015: review of adult studies (PubMed 26114483)', url: 'https://pubmed.ncbi.nlm.nih.gov/26114483/' },
+    { label: 'Gao et al., BRAVO trial 2018 (PMC6584719)', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC6584719' },
+  ],
 };
+
+/** Where each activity in the app comes from. "What studies used" only: the app never sets a dose. */
+export const ACTIVITIES: EvidenceItem[] = [
+  {
+    title: 'Letter Crowd: crowded letters',
+    points: [
+      'Copies crowded-letter training: name the middle letter of a tight group, with the letters getting closer and then smaller as you get them right.',
+      'In small studies of adults and older children, acuity improved and most of the gain was still there months later. A home browser version also helped, though children lost interest after about a week.',
+      'What the studies used: several blocks of letters per session, over 8 to 14 sessions.',
+    ],
+    sources: [
+      { label: 'Hussain et al., J Neurosci 2012 (PMC3428833)', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC3428833' },
+      { label: 'Chung et al., PLoS One 2012 (PMC3340394)', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC3340394' },
+      { label: 'Hussain et al., Front Psychol 2014: home version (PMC4217344)', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC4217344' },
+    ],
+  },
+  {
+    title: 'Stripe Finder: faint stripes',
+    points: [
+      'Copies training with faint stripes at the finest size you can just see, getting fainter as you get them right.',
+      'Small studies, mostly without a comparison group, reported better contrast sensitivity and acuity. Push mode follows a two-eye version that adds noise for the stronger eye.',
+      'What the studies used: about an hour of trials per session, for around 10 sessions.',
+    ],
+    sources: [
+      { label: 'Huang et al., PNAS 2008 (PMC2268837)', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC2268837' },
+      { label: 'Zhou et al., Vision Res 2006 (PubMed 16153674)', url: 'https://pubmed.ncbi.nlm.nih.gov/16153674/' },
+    ],
+  },
+  {
+    title: 'Depth Duel: seeing depth',
+    points: [
+      'Copies red-green depth training: which of two patches looks nearer?',
+      'In a small study of adults, depth perception improved a lot and acuity a little. It is hidden for anyone who reported an eye turn or double vision.',
+    ],
+    sources: [
+      { label: 'Xi et al., IOVS 2014 (PMC3989086)', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC3989086' },
+      { label: 'Vedamurthy et al. 2016: VR depth training (PMC4901458)', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC4901458' },
+    ],
+  },
+  {
+    title: 'Watch: a picture split between the eyes',
+    points: [
+      'Copies dichoptic movies: soft patches of the picture go to the weaker eye, the rest to the stronger eye at lower brightness, and the patches move every 10 seconds.',
+      'A randomized trial of a prescription headset that shows video like this to children aged 4 to 7 was positive. In trials, watching was easier to keep up than playing games.',
+      'What that trial used: 1 hour a day, 6 days a week, for 12 weeks, with glasses.',
+    ],
+    sources: [
+      { label: 'Jost et al., Sci Rep 2022: dichoptic movies (PMC8905014)', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC8905014' },
+      { label: 'Xiao et al., Ophthalmology 2022 (PubMed 34534556)', url: 'https://pubmed.ncbi.nlm.nih.gov/34534556/' },
+    ],
+  },
+  {
+    title: 'Why the slow strong-eye brightness change is small',
+    points: [
+      'A trial compared raising the strong-eye brightness by 0, 5 or 10 points a day and found no difference. So the optional automatic change here is small (2 points), off unless a grown-up turns it on, and can be held.',
+    ],
+    sources: [{ label: 'Contrast increment trial (PMC8328197)', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC8328197' }],
+  },
+];
 
 export const SAFETY_POINTS: EvidenceItem = {
   title: 'The main risk: double vision',

@@ -200,3 +200,27 @@ describe('screen-size check and balance check', () => {
     expect(p?.autoContrast.log.at(-1)?.reason).toBe('balance-check');
   });
 });
+
+describe('Depth Duel and eye turns, in the real app', () => {
+  it('is on home and playable after two clear "no" answers', () => {
+    t = startApp();
+    addReadyProfile(t.app, 'adult');
+    t.app.navigate('/');
+    expect(t.root.querySelector('[data-testid="tile-depth-duel"]')).not.toBeNull();
+  });
+
+  it('is hidden on home and switched off on its route after an eye-turn answer', () => {
+    t = startApp();
+    const id = addReadyProfile(t.app, 'adult');
+    t.app.store.updateProfile(id, (p) => {
+      p.onboarding.screening.eyeTurn = true;
+      p.onboarding.screening.parentConfirmedAt = NOW.toISOString();
+    });
+    t.app.navigate('/');
+    expect(t.root.querySelector('[data-testid="tile-depth-duel"]')).toBeNull();
+    expect(t.root.querySelector('[data-testid="tile-letter-crowd"]')).not.toBeNull();
+    t.app.session.passCheck(id, NOW.getTime());
+    t.app.navigate('/play/depth-duel');
+    expect(byTestId(t.root, 'hidden-for-eye-turn').textContent).toContain('switched off');
+  });
+});
