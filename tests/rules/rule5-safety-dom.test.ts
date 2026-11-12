@@ -201,4 +201,45 @@ describe('rule 5 in the real app', () => {
     expect(t.app.store.activeProfile?.safety.doubleVisionBlockedOn).toBeNull();
     expect(t.app.store.activeProfile?.safety.events.at(-1)?.kind).toBe('block-cleared-by-parent');
   });
+  it('on the real play screen, the pause menu stop button logs the round, ends it and blocks play', async () => {
+    t = startApp();
+    addReadyProfile(t.app);
+    t.app.navigate('/play/falling-blocks');
+    click(byTestId(t.root, 'check-no'));
+    expect(byTestId(t.root, 'start-card').textContent).toContain('Who sees what');
+    click(byTestId(t.root, 'mode-classic'));
+    expect(t.root.querySelector('[data-testid="start-card"]')).toBeNull();
+
+    click(byTestId(t.root, 'pause'));
+    const menu = byTestId(t.root, 'pause-menu');
+    expect(byTestId(menu, 'adjust-colours')).toBeTruthy();
+    click(byTestId(menu, 'adjust-colours'));
+    expect(byTestId(t.root, 'colour-sheet').textContent).toContain('Red lens colour');
+    click(buttonByText(byTestId(t.root, 'colour-sheet'), 'Done'));
+
+    click(byTestId(byTestId(t.root, 'pause-menu'), 'stop-double'));
+    await flush();
+    expect(t.app.currentPath()).toBe('/stopped');
+    expect(guard()).toEqual({ ok: false, reason: 'blocked-today' });
+    const p = t.app.store.activeProfile;
+    expect(p?.safety.events.at(-1)?.kind).toBe('double-or-pain-in-game');
+    expect(p?.progress.sessions.map((s) => [s.gameId, s.endedBy])).toEqual([['falling-blocks', 'doubleVision']]);
+  });
+
+  it('leaving a game logs nothing for a round that never really started, and never logs twice', async () => {
+    t = startApp();
+    addReadyProfile(t.app);
+    t.app.navigate('/play/falling-blocks');
+    click(byTestId(t.root, 'check-no'));
+    click(byTestId(t.root, 'mode-easy'));
+    await new Promise((r) => setTimeout(r, 1300));
+    click(byTestId(t.root, 'pause'));
+    click(buttonByText(byTestId(t.root, 'pause-menu'), 'Stop and go home'));
+    expect(t.app.currentPath()).toBe('/');
+    const sessions = t.app.store.activeProfile?.progress.sessions ?? [];
+    expect(sessions.length).toBe(1);
+    expect(sessions[0]).toMatchObject({ gameId: 'falling-blocks', endedBy: 'quit' });
+    expect(sessions[0].seconds).toBeGreaterThanOrEqual(1);
+    expect(t.app.session.peek(sessions.length ? (t.app.store.activeProfile?.id ?? '') : '', t.clock.now.getTime())?.playedMs).toBeGreaterThan(900);
+  });
 });

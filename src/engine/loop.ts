@@ -12,6 +12,14 @@ export interface Loop {
  * and `render` runs once per animation frame. After a long stall (a hidden tab) at most
  * a quarter of a second is caught up, so the game never lurches forward.
  */
+// Test environments without animation frames fall back to a timer.
+const raf: (cb: (now: number) => void) => number =
+  typeof requestAnimationFrame === 'function'
+    ? (cb) => requestAnimationFrame(cb)
+    : (cb) => setTimeout(() => cb(performance.now()), 16) as unknown as number;
+const caf: (handle: number) => void =
+  typeof cancelAnimationFrame === 'function' ? (handle) => cancelAnimationFrame(handle) : (handle) => clearTimeout(handle);
+
 export function createLoop(step: (dtMs: number) => void, render: () => void): Loop {
   let handle = 0;
   let running = false;
@@ -28,7 +36,7 @@ export function createLoop(step: (dtMs: number) => void, render: () => void): Lo
       if (!running) return;
     }
     render();
-    handle = requestAnimationFrame(frame);
+    handle = raf(frame);
   };
 
   return {
@@ -37,11 +45,11 @@ export function createLoop(step: (dtMs: number) => void, render: () => void): Lo
       running = true;
       acc = 0;
       last = performance.now();
-      handle = requestAnimationFrame(frame);
+      handle = raf(frame);
     },
     stop() {
       running = false;
-      cancelAnimationFrame(handle);
+      caf(handle);
     },
     get running() {
       return running;

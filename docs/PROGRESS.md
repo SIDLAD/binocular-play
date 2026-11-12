@@ -7,30 +7,24 @@ Every session: read this first, and update it before finishing. See `docs/PROMPT
 |---|---|
 | 0 Plan | **done**, approved by the user 2026-11-11 (`docs/PLAN.md`) |
 | 1 Foundation (settings, colours, onboarding, evidence pages) | **done** 2026-11-11 |
-| 2 First game (falling blocks) | **in progress**: rules, drawing and engine done; play screen not built |
+| 2 First game (falling blocks, "Tumble Stack") | **done** 2026-11-12 |
 | 3 Four more games | not started |
 | 4 Progress & polish (dashboard, PWA) | not started |
 | 5 Ship (CI, GitHub Pages, README) | not started |
 
 ## Next step
-Finish Milestone 2. The user paused the build here on 2026-11-11 and may continue with a different model.
+Milestones 1 and 2 are done. Two things are waiting, in this order:
 
-Done and committed for Milestone 2 (all tests pass, lint and build clean):
-- `src/games/falling-blocks/`: `logic.ts` (pure rules, 25 tests in `logic.test.ts`), `game.ts` (drawing, keyboard and touch gestures), `index.ts` (definition, modes `classic` and `easy`, tile icon). Registered in `src/games/registry.ts`, so the home tile, the rule 3 live-colour test and the 60-second flash test already cover it.
-- `src/engine/loop.ts` (fixed 60 Hz), `input.ts` (keyboard and pointer), `shell.ts` (`GameShell`: canvas sizing, loop, input, pause, restart, repaint on palette change while paused). None of these three has been run in a browser yet.
+1. **The user's real-glasses test** (checklist at the bottom of this file). Fix what it finds before building more games: every later game reuses the same renderer, calibration and play screen.
+2. **Milestone 3** (`docs/PROMPT.md`, designs in `docs/PLAN.md` §6): four more games, the low-effort aquarium, reading mode, adaptive difficulty, WebAudio sounds, weekly goals and streaks.
 
-Still to do:
-1. Replace the stub in `src/app/screens/play.ts` with the real play screen, as described in `docs/PLAN.md` §11 "Engine and tests": start card (title, `eyeRule`, `controls`, mode buttons) → `GameShell` on a full-height canvas → HUD as DOM text (score, level, countdown from `remainingMs`/`formatClock` in `core/safety/session.ts`) → pause (button, Escape/P, tab hidden) showing `pauseMenu()` from `app/components/safety.ts` → "Adjust colours" opens `colourEditor(app, scope, { sheet: true })` in a `.editor-sheet` with the paused game visible above it → on-screen buttons from `def.touchButtons` when `isTouchDevice()` → game-over card → break overlay (`breakOverlay()`; "5 more minutes" goes through `requireParent` then `app.session.extend`).
-   - Keep the guard as it is: `play.ts` decides with `canStartGame()` only and must not mention `disclaimerAcceptedAt`, `doubleVisionBlockedOn`, `checkPassedAt` or `completedAt` (a rule 5 test scans for them).
-   - Session logging: feed `onActiveTime` into `app.session.addPlay` (throttle the writes) and, when a round ends, store one record with `makeRecord` + `addSessionRecord` (`core/progress/sessionLog.ts`), `endedBy` = `gameOver | quit | timer | doubleVision`. Log an unfinished round as `quit` when the screen is disposed, once only.
-   - The stop button must log the round as `doubleVision` and then call `stopForDoubleVision(app, 'double-or-pain-in-game')`.
-   - Seed the game with `seededRng(...)`; `reducedMotion` from `prefersReducedMotion(profile.ui.reducedMotion)`; `startLevel` 1.
-   - Add CSS for the play layout to `src/app/styles/base.css` (neutral greys only; no looping animation under 1 s).
-2. Extend `tests/rules/rule5-safety-dom.test.ts`: on the real play screen, pausing shows the stop button, and pressing it logs the round and blocks play.
-3. Verify as in `docs/PLAN.md` §10: lint, tests, build; play a round in the browser with keyboard and at 375×812 and 812×375; read pixels from the game canvas and confirm they match the palette, then change a colour from the pause menu and confirm they change with no reload; check the console.
-4. Update this file, commit, and finish with: what was built, what was and was not verified, and a short real-glasses checklist.
+How to add a game (everything else comes for free):
+- Make `src/games/<id>/` with `logic.ts` (pure, tested), `game.ts` (implements `Game` from `src/engine/api.ts`) and `index.ts` (a `GameDefinition`). Copy the shape of `src/games/falling-blocks/`.
+- Add it to `src/games/registry.ts`. The home tile, play screen, pause menu, touch buttons, break overlay, session log, the rule 3 live-colour test and the 60-second flash test then cover it with no other change.
+- A game may import only `engine/api` and its own files, never picks a colour, and uses `ctx.rng` instead of `Math.random` (rule 1 test and ESLint enforce this). It must draw something at full intensity in both eye channels within the first seconds of play (rule 3 test).
+- Anything a player needs in order to play goes to `weakEye` or `fellowEye`, split so neither eye can play alone. Only frames and grids go to `both`.
 
-Rules from the user for this step: do not push and do not add a git remote; update and commit this file after every milestone.
+Rules from the user so far: do not push and do not add a git remote; update and commit this file after every milestone.
 
 ## Decisions log
 - 2026-11-11: Stack is Vite + TypeScript + Canvas 2D, static site on GitHub Pages, MIT license. No backend, analytics or accounts. (Planning session, Opus 5.5)
@@ -55,8 +49,15 @@ Rules from the user for this step: do not push and do not add a git remote; upda
 - 2026-11-11: Rule 3's test expects every game to draw something at full intensity in both eye channels after a few seconds of play, so the live-colour check can find both colours. (Fable 5.2)
 - 2026-11-11: Tumble Stack touch controls: drag sideways moves one column per cell, a slow drag down lowers the piece without locking it, a tap turns, a fast flick down drops. Mode order is classic then easy. (Fable 5.2)
 
+- 2026-11-12: The play screen (`src/app/screens/play.ts`) owns everything around the canvas; `GameShell` owns the canvas. A round is logged once, when it ends (`gameOver`, `quit`, `timer`, `doubleVision`); rounds under one second are not logged, except a safety stop, which always is. Session time is saved once a second. (Fable 5.2)
+- 2026-11-12: "Adjust colours" in the pause menu opens the colour editor as a bottom sheet and shrinks the paused game into the space above it, so the game itself is the live preview. (Fable 5.2)
+- 2026-11-12: On short landscape screens the touch buttons move to the left and right of the game. (Fable 5.2)
+
 ## Known issues / TODOs
-- `#/play/falling-blocks` still shows the Milestone 1 stub (title and blurb only) after the double-vision check: the game cannot be played in the app yet.
+- Reloading or closing the tab in the middle of a round loses that round's log entry (session time is kept). A `pagehide` handler could save it.
+- Touch gestures on the canvas (drag, tap, flick) are covered by the flash test's random pointer input but were not tried with a real finger. The on-screen buttons were only checked for layout.
+- The game-over card was reached in the browser but not looked at in a screenshot.
+- `startLevel` is always 1; adaptive difficulty is Milestone 3.
 - Link check 2026-11-11 (`npm run check-links`): 23 of 25 load. Check by hand, they refuse scripts (HTTP 403): https://ouci.dntb.gov.ua/works/40NpAzy9 and https://core.ac.uk/download/481629086.pdf.
 - Evidence text for the AAO, Cochrane, ESCRS and Review of Optometry links repeats the summaries in `docs/EVIDENCE.md`; only the PubMed/PMC abstracts were read in full. Read those pages before Milestone 5.
 - The glasses drawing in onboarding shows the lens colours through the channels, which is only right on a dark background (onboarding always is).
@@ -85,3 +86,16 @@ Rules from the user for this step: do not push and do not add a git remote; upda
 - 2026-11-11, Fable 5.2: read all docs, wrote the Milestone 0 plan (five hard rules, truth table, schema, `Game` interface, game designs, risks in CLAUDE.md), got it approved, saved it as docs/PLAN.md with implementation notes in §11, ran `git init`. The user moved the build to a fresh session to save tokens, so no code was written. Commit: "Add project docs and approved Milestone 0 plan".
 - 2026-11-11, Fable 5.2: Milestone 1. Scaffold, colour maths, channel renderer and recording context, settings store with export/import, safety guards, onboarding, guided colour set-up, Colours page, settings, players, grown-ups page, evidence pages. 249 tests pass; lint and build clean; walked in the browser at desktop, 375×812 and 812×375. Commit: "Milestone 1: foundation".
 - 2026-11-11, Fable 5.2: started Milestone 2 and paused at the user's request. Tumble Stack rules, drawing and definition, plus the engine loop, input and shell, are in; the play screen is not. 274 tests pass; lint and build clean; the new engine files are untested in a browser. Commit: "Milestone 2 (part): Tumble Stack rules, drawing and engine shell".
+- 2026-11-12, Fable 5.2: finished Milestone 2. Real play screen (start card, score/level/countdown, pause menu with colour sheet and stop button, touch buttons, game-over card, break overlay, session log). 276 tests pass; lint and build clean. In the browser: played a round with the keyboard; canvas pixels matched the palette (weak #ff0000, strong #009595 at 30 %, frame #999999); changing colours from the pause menu changed the pixels with no reload; phone portrait and landscape layouts fit; break overlay appeared at 0:00 and logged the round; no console errors. Commit: "Milestone 2: Tumble Stack playable end to end".
+
+## Real-glasses checklist for the user
+Run `npm run dev`, open http://localhost:5173, clear site data first if you want the first-run flow.
+1. Onboarding → colour set-up. Cover each eye in turn: does the square vanish when you lower the slider? Note the percentage where it does, and whether a ghost remains at 20 %.
+2. Hidden numbers: with one eye covered, do you see exactly one number? Flip the glasses over and check that the app notices and offers to swap the lens sides.
+3. Balance screen: with both eyes open, can you see the circle and the square together? Does lowering the slider make the weaker eye's circle easier to hold?
+4. Tumble Stack, weaker eye covered: the falling piece, its shadow and the next piece should disappear; the stack, frame and grid stay. Stronger eye covered: the reverse.
+5. Both eyes open: can you land a piece in a gap in the stack? Is the grey frame comfortable or too bright (Colours → Frame brightness)?
+6. Pause → Adjust colours while a piece is on screen: move a slider and watch the game change behind the sheet.
+7. On a phone: are the buttons big enough, and do drag, tap-to-turn and flick-down feel right?
+8. Try red/blue or red/green glasses if you have them, and say which colours leak.
+9. Anything that flickers, hurts or looks double: stop, and tell me what was on screen.
