@@ -45,6 +45,41 @@ describe('hidden-number check', () => {
   });
 });
 
+describe('full screen on the intro screens', () => {
+  it('without the Fullscreen API: a tip only, and the test still starts', () => {
+    t = startApp();
+    addReadyProfile(t.app, 'adult');
+    t.app.navigate('/colours');
+    click(buttonByText(t.root, 'Check with hidden numbers'));
+    expect(overlay().querySelector('[data-testid="go-fullscreen"]')).toBeNull();
+    expect(overlay().textContent).toContain('Make the browser window as big as you can');
+    click(buttonByText(overlay(), 'Start'));
+    expect(heading()).toBe('Cover your LEFT eye');
+  });
+
+  it('with it: a button that asks for full screen, and skipping it is fine', async () => {
+    const calls: number[] = [];
+    Object.defineProperty(document, 'fullscreenEnabled', { configurable: true, value: true });
+    document.documentElement.requestFullscreen = () => {
+      calls.push(1);
+      return Promise.reject(new Error('refused'));
+    };
+    try {
+      t = startApp();
+      addReadyProfile(t.app, 'adult');
+      t.app.navigate('/colours');
+      click(buttonByText(t.root, 'Guided set-up'));
+      click(byTestId(overlay(), 'go-fullscreen'));
+      await flush();
+      expect(calls).toHaveLength(1);
+      click(buttonByText(overlay(), 'Start')); // a refusal never blocks the test
+      expect(heading()).toBe('Cover your LEFT eye');
+    } finally {
+      delete (document as { fullscreenEnabled?: boolean }).fullscreenEnabled;
+    }
+  });
+});
+
 describe('"Your glasses" on the Colours page', () => {
   it('swaps the lens sides and the colour cards follow', () => {
     t = startApp();

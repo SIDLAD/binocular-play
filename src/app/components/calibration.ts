@@ -90,6 +90,43 @@ function channelOfEye(app: App, eye: Eye): Channel {
 
 const upper = (eye: Eye) => eye.toUpperCase();
 
+/**
+ * A "Go full screen" button for the intro screens, so nothing else on the screen is
+ * in view during the test. Optional: skipping it never blocks the test. Hidden where the
+ * Fullscreen API is missing (iPhone Safari); the tip text stays.
+ */
+function fullscreenTip(flow: Flow): HTMLElement {
+  const supported = typeof document !== 'undefined' && document.fullscreenEnabled === true;
+  const tip = h(
+    'p',
+    { class: 'small muted' },
+    supported ? 'Full screen works best, so only the test is in view.' : 'Make the browser window as big as you can, so only the test is in view.',
+  );
+  if (!supported) return tip;
+  const go = button(
+    'Go full screen',
+    async () => {
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+          flow.scope.onDispose(() => {
+            try {
+              if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+            } catch {
+              // Leaving full screen is a nicety; ignore failures.
+            }
+          });
+        }
+      } catch {
+        // Refused or unsupported: the test still works in a window.
+      }
+    },
+    'plain',
+    { 'data-testid': 'go-fullscreen' },
+  );
+  return h('div', { class: 'stack' }, tip, go);
+}
+
 function leakTips(): HTMLElement {
   return h(
     'details',
@@ -337,6 +374,7 @@ export function openCalibration(app: App, parent: Scope, onClose: (completed: bo
         h('li', null, 'Turn off night light, True Tone, blue-light filters and automatic brightness.'),
         h('li', null, 'Turn the screen brightness up and dim the room lights if you can.'),
       ),
+      fullscreenTip(flow),
       h('div', { class: 'actions' }, button('Start', () => left(), 'primary'), button('Not now', () => flow.close(false))),
     );
   };
@@ -377,6 +415,7 @@ export function openEyeTest(app: App, parent: Scope, onClose: () => void): void 
     flow,
     h('h2', null, 'Check your colours'),
     h('p', null, 'Put your glasses on. You will cover one eye at a time and say which number you can see.'),
+    fullscreenTip(flow),
     h('div', { class: 'actions' }, button('Start', check, 'primary'), button('Close', () => flow.close(false))),
   );
 }
