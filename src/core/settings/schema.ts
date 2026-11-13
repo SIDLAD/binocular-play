@@ -98,6 +98,8 @@ export interface Profile {
   };
   /** Difficulty and progress kept per game (numbers only). */
   gameProgress: Record<string, Record<string, number>>;
+  /** Trials per block the player picked on a training task's start card, per game id. */
+  blockTrials: Record<string, number>;
   /** Weekly goal set by a grown-up (or the adult player). */
   goal: { daysPerWeek: number; minutesPerDay: number };
   session: {
@@ -169,6 +171,7 @@ export function createProfile(init: {
     fellowContrast: 1,
     autoContrast: { enabled: false, hold: false, balanceMax: null, balanceCheckedAt: null, lastDay: null, log: [] },
     gameProgress: {},
+    blockTrials: {},
     goal: { daysPerWeek: 5, minutesPerDay: 20 },
     session: { lengthMin: 20, breakReminder: true, patchReminder: { enabled: false, note: '' } },
     safety: { doubleVisionBlockedOn: null, events: [] },

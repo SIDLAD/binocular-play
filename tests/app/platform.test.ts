@@ -169,6 +169,12 @@ describe('stored data', () => {
     expect(p.progress.sessions[0].activeSeconds).toBe(90);
   });
 
+  it('block lengths keep whole numbers per game, and old files get none', () => {
+    const data = sanitizeAppData({ profiles: [{ id: 'p', blockTrials: { 'depth-duel': 10, a: 'x', b: 0, c: 9.6, d: 1e9 } }, { id: 'q' }] });
+    expect(data.profiles[0].blockTrials).toEqual({ 'depth-duel': 10, b: 1, c: 10, d: 500 });
+    expect(data.profiles[1].blockTrials).toEqual({});
+  });
+
   it('game progress keeps numbers only', () => {
     const data = sanitizeAppData({ profiles: [{ id: 'p', gameProgress: { g: { level: 3, bad: 'x', inf: Infinity } } }] });
     expect(data.profiles[0].gameProgress).toEqual({ g: { level: 3 } });
@@ -222,6 +228,58 @@ describe('Depth Duel and eye turns, in the real app', () => {
     t.app.session.passCheck(id, NOW.getTime());
     t.app.navigate('/play/depth-duel');
     expect(byTestId(t.root, 'hidden-for-eye-turn').textContent).toContain('switched off');
+  });
+});
+
+describe('choosing how many answers a training block lasts', () => {
+  it('Depth Duel’s start card offers block lengths, remembers the pick, and the game uses it', async () => {
+    t = startApp();
+    const id = addReadyProfile(t.app, 'adult');
+    t.app.session.passCheck(id, NOW.getTime());
+    t.app.navigate('/play/depth-duel');
+    const chooser = byTestId(byTestId(t.root, 'start-card'), 'block-chooser');
+    expect(byTestId(chooser, 'block-40').getAttribute('aria-pressed')).toBe('true');
+    click(byTestId(chooser, 'block-5'));
+    expect(byTestId(chooser, 'block-5').getAttribute('aria-pressed')).toBe('true');
+    expect(t.app.store.activeProfile?.blockTrials['depth-duel']).toBe(5);
+
+    // Another visit starts with the same pick.
+    t.app.navigate('/');
+    t.app.navigate('/play/depth-duel');
+    expect(byTestId(t.root, 'block-5').getAttribute('aria-pressed')).toBe('true');
+    expect(byTestId(t.root, 'block-40').getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('Pause → "End this block now" shows the result and logs the block like a normal end', async () => {
+    t = startApp();
+    const id = addReadyProfile(t.app, 'adult');
+    t.app.session.passCheck(id, NOW.getTime());
+    t.app.navigate('/play/depth-duel');
+    click(byTestId(t.root, 'block-10'));
+    click(byTestId(t.root, 'mode-default'));
+    await new Promise((r) => setTimeout(r, 1300));
+    click(byTestId(t.root, 'pause'));
+    const menu = byTestId(t.root, 'pause-menu');
+    expect(byTestId(menu, 'not-working-note').textContent).toContain('eye doctor');
+    expect(byTestId(menu, 'stop-double')).toBeTruthy();
+    click(byTestId(menu, 'end-now'));
+    const over = byTestId(t.root, 'game-over');
+    expect(over.querySelector('[data-testid="trials-result"]')).toBeNull(); // no answers yet (still on the intro)
+    expect(byTestId(over, 'short-block-note').textContent).toContain('short');
+    expect(byTestId(over, 'block-chooser')).toBeTruthy();
+    const sessions = t.app.store.activeProfile?.progress.sessions ?? [];
+    expect(sessions.map((s) => [s.gameId, s.endedBy])).toEqual([['depth-duel', 'gameOver']]);
+  });
+
+  it('games without blocks have no chooser and no "End now"', () => {
+    t = startApp();
+    const id = addReadyProfile(t.app);
+    t.app.session.passCheck(id, NOW.getTime());
+    t.app.navigate('/play/falling-blocks');
+    expect(t.root.querySelector('[data-testid="block-chooser"]')).toBeNull();
+    click(byTestId(t.root, 'mode-classic'));
+    click(byTestId(t.root, 'pause'));
+    expect(t.root.querySelector('[data-testid="end-now"]')).toBeNull();
   });
 });
 

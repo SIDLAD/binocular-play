@@ -161,6 +161,15 @@ export class GameShell {
     return this.game.status();
   }
 
+  /** Training tasks: ends the block now (see Game.endNow). False when the game has no blocks. */
+  endNow(): boolean {
+    if (!this.game.endNow || this.wasOver) return false;
+    this.game.endNow();
+    this.wasOver = this.game.status().over;
+    this.renderOnce();
+    return this.wasOver;
+  }
+
   /** What the game wants kept for next time. */
   save(): Record<string, number> | null {
     return this.game.save ? this.game.save() : null;

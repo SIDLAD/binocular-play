@@ -63,9 +63,11 @@ export class LetterCrowd implements Game {
   private h = 300;
   private over = false;
   private minArcmin: number;
+  private readonly trials: number;
 
   constructor(private ctx: GameContext) {
     const s = ctx.saved ?? {};
+    this.trials = ctx.blockTrials ?? BLOCK_TRIALS;
     this.sizeArcmin = typeof s.sizeArcmin === 'number' ? s.sizeArcmin : START_SIZE_ARCMIN;
     this.blocks = typeof s.blocks === 'number' ? s.blocks : 0;
     // Smallest letter the screen can draw: a stroke of at least one device pixel.
@@ -155,13 +157,19 @@ export class LetterCrowd implements Game {
 
   private endBlock(): void {
     this.over = true;
-    this.blocks++;
-    if (!this.relaxed) {
+    if (this.done > 0) this.blocks++;
+    // The letter size moves (by one 10 % step at most) only once the spacing has turned
+    // round at least twice; a very short block leaves it as it was.
+    if (!this.relaxed && this.stair.settled(2)) {
       const accuracy = this.done ? this.correct / this.done : 0;
       const before = this.sizeArcmin;
       this.sizeArcmin = nextSize(this.sizeArcmin, this.stair.estimate(), accuracy, this.minArcmin);
       if (this.sizeArcmin < before) this.ctx.sound('level');
     }
+  }
+
+  endNow(): void {
+    if (!this.over) this.endBlock();
   }
 
   update(dtMs: number): void {
@@ -184,7 +192,7 @@ export class LetterCrowd implements Game {
         break;
       case 'feedback':
         if (this.phaseMs >= FEEDBACK_MS) {
-          if (this.done >= BLOCK_TRIALS) {
+          if (this.done >= this.trials) {
             this.endBlock();
             return;
           }
@@ -222,7 +230,7 @@ export class LetterCrowd implements Game {
     if (this.phase === 'feedback') {
       r.text('both', this.lastRight ? 'Yes!' : `It was ${this.trial.target}`, x, y, { align: 'center', size: 20, bold: true });
     }
-    r.text('both', `${this.done} / ${BLOCK_TRIALS}`, 12, 16, { size: 13, intensity: 0.7 });
+    r.text('both', `${this.done} / ${this.trials}`, 12, 16, { size: 13, intensity: 0.7 });
 
     const active = this.phase === 'answer' || (this.phase === 'show' && this.relaxed);
     this.buttons.forEach((b, i) => {
@@ -240,6 +248,7 @@ export class LetterCrowd implements Game {
       over: this.over,
       trials: { done: this.done, correct: this.correct },
       targetMet: this.done >= 10 ? accuracy >= 0.65 : undefined,
+      settled: this.relaxed ? undefined : this.stair.settled(),
     };
   }
 

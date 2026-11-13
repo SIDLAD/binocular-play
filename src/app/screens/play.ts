@@ -7,7 +7,7 @@ import { canStartGame, localDay } from '../../core/safety/guards';
 import { eyeTurnCaution } from '../../core/safety/screening';
 import { formatClock, remainingMs } from '../../core/safety/session';
 import type { EndedBy, Profile } from '../../core/settings/schema';
-import { seededRng, type GameContext, type GameDefinition, type GameMode, type GameStatus } from '../../engine/api';
+import { blockTrialsFor, seededRng, type GameContext, type GameDefinition, type GameMode, type GameStatus } from '../../engine/api';
 import { VideoMedia } from '../../engine/media';
 import { GameShell } from '../../engine/shell';
 import { findGame } from '../../games/registry';
@@ -129,7 +129,43 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
       sound: (kind) => {
         if (app.store.activeProfile?.ui.sound) playTone(kind);
       },
+      blockTrials: chosenBlockTrials(),
     };
+  };
+
+  /** Trials per block for training tasks: the player's pick for this game, or the task's default. */
+  function chosenBlockTrials(): number | null {
+    if (!def.blockLengths) return null;
+    return blockTrialsFor(def.blockLengths, app.store.activeProfile?.blockTrials[def.id]);
+  }
+
+  /** "How many answers?" buttons for the start and result cards. The pick is kept per player and per game. */
+  const blockChooser = (when: 'this' | 'next' = 'this'): HTMLElement | null => {
+    const spec = def.blockLengths;
+    if (!spec) return null;
+    const current = chosenBlockTrials();
+    const group = h('div', { class: 'row', role: 'group', 'aria-label': 'Answers in this block' });
+    const buttons = spec.choices.map((n) =>
+      button(
+        String(n),
+        () => {
+          buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(spec.choices[i] === n)));
+          app.store.updateProfile(profileId, (p) => {
+            p.blockTrials[def.id] = n;
+          });
+        },
+        'plain',
+        { 'aria-pressed': String(n === current), 'data-testid': `block-${n}` },
+      ),
+    );
+    group.append(...buttons);
+    return h(
+      'div',
+      { class: 'card', 'data-testid': 'block-chooser' },
+      h('p', null, h('strong', null, `How many answers ${when} time?`)),
+      group,
+      h('p', { class: 'small muted' }, `Shorter is fine; you can also end early from Pause. The level settles best over 20 or more. Usual: ${spec.default}.`),
+    );
   };
 
   const lengthMin = () => app.store.activeProfile?.session.lengthMin ?? 20;
@@ -324,6 +360,8 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
           onResume: resume,
           onAdjustColours: showColours,
           onRestart: () => begin(mode),
+          onEndNow: def.blockLengths ? endNow : undefined,
+          notWorkingNote: def.notWorkingNote,
           onQuit: () => {
             endRound('quit');
             app.navigate('/');
@@ -336,6 +374,12 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
       ),
     );
   };
+
+  /** Pause menu → "End this block now": the block ends and is logged like one that ran to its end. */
+  function endNow(): void {
+    if (phase !== 'paused' || !shell.endNow()) return;
+    gameOver(shell.status());
+  }
 
   function pause(): void {
     if (phase !== 'playing') return;
@@ -358,6 +402,13 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
     layerScope.onDispose(() => sheetScope.dispose());
   };
 
+  /** Missed the target, or under 60 % right: the result card shows the task's gentle "not working out" line. */
+  const hardGoing = (status: GameStatus): boolean => {
+    if (status.targetMet === false) return true;
+    const t = status.trials;
+    return !!t && t.done > 0 && t.correct / t.done < 0.6;
+  };
+
   const gameOver = (status: GameStatus) => {
     phase = 'over';
     media?.pause();
@@ -371,6 +422,12 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
           { class: 'dialog', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Round over', 'data-testid': 'game-over' },
           h('h2', null, best ? 'New best score!' : 'Good round!'),
           h('p', null, `Score ${status.score} · Level ${status.level}`),
+          status.trials && status.trials.done > 0 ? h('p', { 'data-testid': 'trials-result' }, `${status.trials.correct} right out of ${status.trials.done}`) : null,
+          status.settled === false
+            ? h('p', { class: 'small', 'data-testid': 'short-block-note' }, 'This block was short, so the level is only a rough guide and moved little or not at all. Longer blocks (20 or more answers) give a steadier level.')
+            : null,
+          def.notWorkingNote && hardGoing(status) ? h('p', { class: 'small', 'data-testid': 'not-working-note' }, def.notWorkingNote) : null,
+          blockChooser('next'),
           h('div', { class: 'stack' }, button('Play again', () => begin(mode), 'primary', { class: 'btn-big' }), button('Back to the games', () => app.navigate('/'))),
         ),
       ),
@@ -427,6 +484,7 @@ function gameScreen(app: App, def: GameDefinition, profileId: string, scope: Sco
           h('h2', null, def.title),
           h('p', null, def.blurb),
           def.usesVisualAngle ? distance : null,
+          blockChooser(),
           h(
             'div',
             { class: 'stack' },

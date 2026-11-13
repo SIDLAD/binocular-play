@@ -53,6 +53,27 @@ describe('Letter Crowd rules', () => {
     expect(g.save().blocks).toBe(1);
   });
 
+  it('a block lasts as many answers as picked; a short one leaves the letter size alone', () => {
+    const g = new LetterCrowd(testContext({ mode: 'classic', blockTrials: 10, saved: { sizeArcmin: 30, blocks: 3 } }));
+    g.resize(400, 700);
+    let guard = 0;
+    while (!g.status().over && guard++ < 100_000) {
+      g.update(50);
+      g.input({ kind: 'key', key: 'K' });
+    }
+    expect(g.status().trials?.done).toBe(10);
+    expect(g.save().blocks).toBe(4);
+    if (!g.status().settled) expect(g.save().sizeArcmin).toBe(30);
+  });
+
+  it('"End now" ends the block and counts it once there are answers', () => {
+    const g = new LetterCrowd(testContext({ mode: 'classic' }));
+    g.resize(400, 700);
+    g.endNow();
+    expect(g.status().over).toBe(true);
+    expect(g.save().blocks).toBe(0);
+  });
+
   it('answers in Classic only count after the letter has gone', () => {
     const g = new LetterCrowd(testContext({ mode: 'classic' }));
     g.resize(400, 700);

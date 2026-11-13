@@ -7,6 +7,8 @@
  *   fellowEye – seen only by the stronger eye (dimmed by the contrast setting)
  *   both      – neutral grey, seen by both eyes (frames and grids that help the eyes fuse)
  */
+import type { BlockLengths } from '../core/progress/blockLength';
+
 export type Channel = 'weakEye' | 'fellowEye' | 'both';
 
 export interface DrawOpts {
@@ -169,6 +171,11 @@ export interface GameContext {
   weakEyeSide: 'left' | 'right';
   /** Gentle feedback tones. The app mutes them when sound is off. */
   sound(kind: SoundKind): void;
+  /**
+   * Trials in this block, picked by the player on the start card from the definition's
+   * `blockLengths`. Null for games without blocks (use the game's own default).
+   */
+  blockTrials: number | null;
 }
 
 export type SoundKind = 'good' | 'bad' | 'tick' | 'level';
@@ -183,6 +190,11 @@ export interface GameStatus {
   trials?: { done: number; correct: number };
   /** Whether this round met the game's target (used by the optional contrast policy). */
   targetMet?: boolean;
+  /**
+   * Training tasks: false when the block was too short for the level to settle (too few
+   * staircase reversals). The level is then kept, not moved, and the result card says so.
+   */
+  settled?: boolean;
 }
 
 export interface Game {
@@ -196,6 +208,11 @@ export interface Game {
   dispose(): void;
   /** Progress to keep for next time (difficulty level, staircase value). */
   save?(): SavedProgress;
+  /**
+   * Ends the block now, from the pause menu, as if it had run to its end: status().over
+   * becomes true and save() keeps what the block reached. Training tasks only.
+   */
+  endNow?(): void;
 }
 
 /** An on-screen button the play screen draws for touch devices. */
@@ -251,6 +268,13 @@ export interface GameDefinition {
   /** Passive games: idle time still counts as active (nothing to press). */
   passive?: boolean;
   group: GameGroup;
+  /** Training tasks: block lengths the start card offers (see `GameContext.blockTrials`). */
+  blockLengths?: BlockLengths;
+  /**
+   * A gentle line for the pause menu and the result card when the task is not working out
+   * for the player. Never a diagnosis.
+   */
+  notWorkingNote?: string;
   evidence: { badge: EvidenceBadge; note: string };
   touchButtons: TouchButton[];
   create(ctx: GameContext): Game;
@@ -283,6 +307,7 @@ export function testGameContext(over: Partial<GameContext> = {}): GameContext {
     text: null,
     weakEyeSide: 'left',
     sound: () => {},
+    blockTrials: null,
     ...over,
   };
 }
@@ -296,3 +321,4 @@ export function randomBlobs(rng: () => number, count = 6): MaskBlob[] {
 
 export { Staircase, type StaircaseRule, type StaircaseState } from '../core/adaptive/staircase';
 export { CatchSchedule } from './catchTargets';
+export { blockTrialsFor, startBackOff, type BlockLengths } from '../core/progress/blockLength';
