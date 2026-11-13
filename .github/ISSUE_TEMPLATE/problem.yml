@@ -1,0 +1,27 @@
+name: Something isn't working
+description: A game or page breaks, looks wrong, is slow or confusing.
+title: "[Problem] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping. Issues are **public**: please don't include names, ages, or medical details.
+        Questions about your eyes or treatment belong with your eye doctor.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you see, and what did you expect instead?
+    validations:
+      required: true
+  - type: input
+    id: game
+    attributes:
+      label: Which game or page?
+      placeholder: e.g. Star Patrol, Colours page
+  - type: textarea
+    id: setup
+    attributes:
+      label: Your set-up
+      description: Device, browser, glasses type. The app can fill this in for you.

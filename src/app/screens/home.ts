@@ -144,6 +144,7 @@ export const homeScreen: Screen = (app, _params, scope) => {
         link('Players', '#/profiles', 'btn btn-plain'),
         link('For grown-ups', '#/parent', 'btn btn-plain'),
         link('Is this real?', '#/evidence', 'btn btn-plain'),
+        link('Feedback', '#/feedback', 'btn btn-plain'),
       ),
     ),
     footer(),

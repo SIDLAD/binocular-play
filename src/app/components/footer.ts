@@ -11,6 +11,7 @@ export function footer(): HTMLElement {
       { 'aria-label': 'About' },
       link('Is this real? The evidence', '#/evidence'),
       link('Other treatments', '#/treatments'),
+      link('Feedback', '#/feedback'),
     ),
     h('p', null, DISCLAIMER_SHORT),
     h('p', null, `${FREE_PROMISE} ${PRIVACY_LINE} Open source, MIT licence.`),

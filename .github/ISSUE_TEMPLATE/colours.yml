@@ -1,0 +1,26 @@
+name: Colours or glasses trouble
+description: One eye sees both colours, a colour is too faint, the number check is confusing.
+title: "[Colours] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Issues are **public**: please don't include names, ages, or medical details.
+  - type: textarea
+    id: what
+    attributes:
+      label: What do you see?
+      description: For example "the blue shows through the red lens even at low brightness".
+    validations:
+      required: true
+  - type: input
+    id: glasses
+    attributes:
+      label: Which glasses?
+      placeholder: e.g. red/blue, plastic, brand if you know it
+  - type: textarea
+    id: setup
+    attributes:
+      label: Your set-up
+      description: Device, browser, screen. The app can fill this in for you.

@@ -3,6 +3,7 @@ import { balanceScreen } from './screens/balance';
 import { displayScreen } from './screens/display';
 import { coloursScreen } from './screens/colours';
 import { evidenceScreen, treatmentsScreen } from './screens/evidence';
+import { feedbackScreen } from './screens/feedback';
 import { homeScreen } from './screens/home';
 import { onboardingScreen } from './screens/onboarding';
 import { parentScreen } from './screens/parent';
@@ -24,7 +25,8 @@ export const ROUTES: Record<string, Screen> = {
   '/stopped': stoppedScreen,
   '/display': displayScreen,
   '/balance': balanceScreen,
+  '/feedback': feedbackScreen,
 };
 
 /** Reachable before onboarding is finished: the evidence must never be locked away. */
-export const OPEN_ROUTES = ['/onboarding', '/evidence', '/treatments', '/profiles'];
+export const OPEN_ROUTES = ['/onboarding', '/evidence', '/treatments', '/profiles', '/feedback'];
