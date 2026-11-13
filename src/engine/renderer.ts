@@ -203,7 +203,9 @@ export class CanvasChannelRenderer implements Renderer {
     const n = Math.max(2, Math.round(spec.size * dpr));
     const cyclesPerPx = (spec.cyclesPerDegree ?? 0) / (this.pxPerDegree * dpr);
     const grain = Math.max(1, Math.round((spec.grain ?? 2) * dpr));
-    const key = `${JSON.stringify(spec)}|${toHex(colour)}|${toHex(p.background)}|${n}|${cyclesPerPx.toFixed(6)}|${grain}`;
+    // Key on the rounded size `n`, not the raw float: a size that drifts in the last
+    // decimal places (a moving game object) must not rebuild the pattern every frame.
+    const key = `${JSON.stringify({ ...spec, size: n })}|${toHex(colour)}|${toHex(p.background)}|${n}|${cyclesPerPx.toFixed(6)}|${grain}`;
     let entry = this.patterns.get(key);
     if (!entry) {
       const field = patternField(spec, n, cyclesPerPx, grain);

@@ -52,6 +52,8 @@ export class StarPatrol implements Game {
   private enemies: Enemy[] = [];
   private pickups: { x: number; y: number }[] = [];
   private gate: Gate | null = null;
+  /** Stripe contrast of the gate on screen, fixed when it appears (the staircase moves on as you pass). */
+  private gateContrast = 1;
   private gateIn: number;
   private gateStair: Staircase;
   private gatesShown = 0;
@@ -211,6 +213,7 @@ export class StarPatrol implements Game {
       this.gateIn -= dtMs;
       if (this.gateIn <= 0) {
         this.gate = makeGate(this.ctx.rng, this.w + 60);
+        this.gateContrast = this.gateStair.value;
         this.gatesShown++;
       }
       return;
@@ -275,7 +278,9 @@ export class StarPatrol implements Game {
     // Gate (weak eye stripes; the frames and the arrow are for both eyes).
     if (this.gate) {
       const g = this.gate;
-      const c = this.cave(Math.max(0, Math.min(w, g.x)));
+      // The cave at the gate's own spot (fixed in the world while the gate scrolls), so the
+      // windows keep one size and the renderer builds each striped window only once.
+      const c = this.cave(g.x);
       const mid = (c.top + c.bottom) / 2;
       const size = Math.min((c.bottom - c.top) / 2 - 8, w * 0.25);
       const other = g.lean === 'left' ? 'right' : 'left';
@@ -287,7 +292,7 @@ export class StarPatrol implements Game {
           size,
           cyclesPerDegree: GATE_CPD,
           orientation: lean(win) === 'right' ? Math.PI / 4 : -Math.PI / 4,
-          contrast: this.gateStair.value,
+          contrast: this.gateContrast,
         });
         r.circle('both', g.x, cy, size / 2 + 4, { outline: 2, intensity: 0.5 });
       }
