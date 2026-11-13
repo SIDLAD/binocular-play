@@ -107,8 +107,31 @@ function leakTips(): HTMLElement {
   );
 }
 
-/** One "make it disappear" step for the eye that is closed. */
+/**
+ * "Cover your X eye" on its own, with nothing drawn on the screen. The test shapes appear
+ * only after the player says the eye is covered, so they never see them with both eyes first.
+ */
+function coverStep(flow: Flow, closed: Eye, what: string, onCovered: () => void, onBack?: () => void): void {
+  flow.setDraw(() => {});
+  setPanel(
+    flow,
+    h('h2', null, `Cover your ${upper(closed)} eye`),
+    h('p', null, `Cover your ${closed} eye with your hand. Keep your glasses on, and do not press on the eye.`),
+    h(
+      'div',
+      { class: 'actions' },
+      button(`I’ve covered it, show the ${what}`, onCovered, 'primary', { class: 'btn-big', 'data-testid': 'covered' }),
+      onBack ? button('Back', onBack) : null,
+    ),
+  );
+}
+
+/** One "make it disappear" step for the eye that is closed (after the cover step). */
 function adjustStep(flow: Flow, closed: Eye, onNext: () => void, onBack: () => void): void {
+  coverStep(flow, closed, 'shapes', () => adjustShapes(flow, closed, onNext, onBack), onBack);
+}
+
+function adjustShapes(flow: Flow, closed: Eye, onNext: () => void, onBack: () => void): void {
   const { app } = flow;
   const profile = app.store.activeProfile;
   if (!profile) return flow.close(false);
@@ -144,12 +167,8 @@ function adjustStep(flow: Flow, closed: Eye, onNext: () => void, onBack: () => v
 
   setPanel(
     flow,
-    h('h2', null, `Cover your ${upper(closed)} eye`),
-    h(
-      'p',
-      null,
-      `Cover your ${closed} eye with your hand (do not press on it) and look with your ${open} eye. You should see the circle clearly.`,
-    ),
+    h('h2', null, `${upper(closed)} eye covered`),
+    h('p', null, `Keep your ${closed} eye covered and look with your ${open} eye. You should see the circle clearly.`),
     h(
       'p',
       null,
@@ -176,8 +195,13 @@ function randomDigits(): [number, number] {
   return [a, b];
 }
 
-/** One hidden-number round. Each number is drawn for one eye only. */
+/** One hidden-number round: the cover step first, then the numbers. */
 function numberRound(flow: Flow, closed: Eye, onAnswer: (o: Outcome) => void): void {
+  coverStep(flow, closed, 'numbers', () => showNumbers(flow, closed, onAnswer));
+}
+
+/** Each number is drawn for one eye only. */
+function showNumbers(flow: Flow, closed: Eye, onAnswer: (o: Outcome) => void): void {
   const { app } = flow;
   const open = otherEye(closed);
   const [forOpen, forClosed] = randomDigits();
@@ -201,11 +225,11 @@ function numberRound(flow: Flow, closed: Eye, onAnswer: (o: Outcome) => void): v
   options.sort((a, b) => Number(a[0]) - Number(b[0]));
   setPanel(
     flow,
-    h('h2', null, `Cover your ${upper(closed)} eye`),
-    h('p', null, `Look with your ${open} eye only. Which number can you see?`),
+    h('h2', null, `${upper(closed)} eye covered`),
+    h('p', null, `Keep it covered. Which number can you see with your ${open} eye?`),
     h(
       'div',
-      { class: 'answers' },
+      { class: 'answers', 'data-testid': 'answers' },
       ...options.map(([label, outcome]) => button(label, () => onAnswer(outcome), 'plain', { class: 'btn-big' })),
       button('Both numbers', () => onAnswer('leak'), 'plain', { class: 'btn-big' }),
       button('No number', () => onAnswer('dim'), 'plain', { class: 'btn-big' }),

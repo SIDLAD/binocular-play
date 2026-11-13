@@ -2,13 +2,14 @@ import { PRESETS } from '../../core/colour/presets';
 import { checkSeparation } from '../../core/colour/separation';
 import { MIN_CONTRAST, defaultCalibration } from '../../core/settings/schema';
 import type { App } from '../app';
-import { button, clear, h, type Scope } from '../dom';
+import { button, clear, h, link, type Scope } from '../dom';
 import { drawPreview } from './art';
 import { openCalibration, openEyeTest } from './calibration';
 import { channelCanvas } from './channelCanvas';
 import { colourControl, type EyeGuide } from './colourControl';
 import { colourSeenOnlyThrough, otherEye, otherKey, type ColourKey } from '../../core/colour/mapping';
 import { confirmDialog } from './dialogs';
+import { glassesControls } from './glassesControls';
 
 /**
  * The colour editor. The same component is the Colours page and the "Adjust colours"
@@ -17,13 +18,31 @@ import { confirmDialog } from './dialogs';
  * immediately: there is no Save button and no reload.
  */
 export function colourEditor(app: App, scope: Scope, options: { sheet: boolean; onClose?: () => void }): HTMLElement {
-  const root = h('div', { class: 'colour-editor' });
+  const outer = h('div', { class: 'colour-editor' });
+  const root = h('div', { class: 'colour-editor-body' });
   let inner = scope.child();
+
+  // "Your glasses" stays put while the rest is rebuilt, so the control just used keeps focus.
+  const eyes = glassesControls(app, () => build(), { swapButton: true });
+  if (eyes) {
+    outer.appendChild(
+      h(
+        'details',
+        { class: 'card your-glasses', open: !options.sheet, 'data-testid': 'your-glasses' },
+        h('summary', null, h('strong', null, 'Your glasses')),
+        eyes.glasses,
+        eyes.redLens,
+        options.sheet ? null : h('p', { class: 'small muted' }, 'Which eye is weaker is set in ', link('Settings', '#/settings'), '.'),
+      ),
+    );
+  }
+  outer.appendChild(root);
 
   const build = () => {
     inner.dispose();
     inner = scope.child();
     clear(root);
+    eyes?.sync();
     const profile = app.store.activeProfile;
     if (!profile) return;
     const preset = PRESETS[profile.vision.glasses];
@@ -184,5 +203,5 @@ export function colourEditor(app: App, scope: Scope, options: { sheet: boolean; 
   };
 
   build();
-  return root;
+  return outer;
 }

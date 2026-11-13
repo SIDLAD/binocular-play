@@ -622,6 +622,13 @@ canvas.preview {
 .colour-control details.more-colour .wheel-row {
   margin-top: 8px;
 }
+.your-glasses > summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+.your-glasses .setting {
+  padding: 10px 0;
+}
 .colour-editor .cover-intro {
   margin: 0 0 var(--gap);
 }

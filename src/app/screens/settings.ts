@@ -1,8 +1,9 @@
 import { lensOverEye } from '../../core/colour/mapping';
-import { GLASSES, PRESETS, type Glasses } from '../../core/colour/presets';
-import { MIN_CONTRAST, defaultCalibration, type Profile } from '../../core/settings/schema';
+import { PRESETS } from '../../core/colour/presets';
+import { MIN_CONTRAST, type Profile } from '../../core/settings/schema';
 import type { App } from '../app';
-import { confirmDialog, requireParent } from '../components/dialogs';
+import { requireParent } from '../components/dialogs';
+import { glassesControls, select, setting, toggleGroup } from '../components/glassesControls';
 import { page } from '../components/footer';
 import { button, clear, h, link, type Child } from '../dom';
 import type { Screen } from '../router';
@@ -38,33 +39,7 @@ export function gated(app: App, title: string, back: string, build: () => Child[
   return page(title, [holder], { back });
 }
 
-export function setting(label: string, help: string | null, control: Child): HTMLElement {
-  return h('div', { class: 'setting' }, h('div', { class: 'label' }, label), help ? h('div', { class: 'help' }, help) : null, control);
-}
-
-function toggleGroup<T extends string>(label: string, options: { value: T; label: string }[], current: T, onPick: (v: T) => void): HTMLElement {
-  const group = h('div', { class: 'row', role: 'group', 'aria-label': label });
-  const buttons = options.map((o) =>
-    button(
-      o.label,
-      () => {
-        buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(options[i].value === o.value)));
-        onPick(o.value);
-      },
-      'plain',
-      { 'aria-pressed': String(o.value === current) },
-    ),
-  );
-  group.append(...buttons);
-  return group;
-}
-
-function select<T extends string>(label: string, options: { value: T; label: string }[], current: T, onPick: (v: T) => void): HTMLSelectElement {
-  const el = h('select', { 'aria-label': label }, ...options.map((o) => h('option', { value: o.value }, o.label)));
-  el.value = current;
-  el.addEventListener('change', () => onPick(el.value as T));
-  return el;
-}
+export { setting };
 
 export const settingsScreen: Screen = (app) =>
   gated(app, 'Settings', '/', () => {
@@ -80,30 +55,7 @@ export const settingsScreen: Screen = (app) =>
     };
     describe();
 
-    const glasses = select<Glasses>(
-      'Glasses type',
-      GLASSES.map((g) => ({ value: g, label: PRESETS[g].label })),
-      profile.vision.glasses,
-      async (v) => {
-        const current = app.store.activeProfile?.vision.glasses;
-        if (v === current) return;
-        const ok = await confirmDialog(
-          app,
-          'Change glasses type?',
-          'The colours will go back to the starting values for the new glasses, so you will need to set them up again.',
-          'Change',
-        );
-        if (!ok) {
-          if (current) glasses.value = current;
-          return;
-        }
-        app.store.updateActive((p) => {
-          p.vision.glasses = v;
-          p.calibration = defaultCalibration(v);
-        });
-        describe();
-      },
-    );
+    const eyes = glassesControls(app, describe, { swapButton: true });
 
     const contrast = h('input', {
       type: 'range',
@@ -139,25 +91,8 @@ export const settingsScreen: Screen = (app) =>
         'div',
         { class: 'card' },
         h('h2', null, 'Glasses and eyes'),
-        setting('Glasses type', null, glasses),
-        setting(
-          'Red lens is on the',
-          null,
-          toggleGroup(
-            'Red lens side',
-            [
-              { value: 'left', label: 'Left eye' },
-              { value: 'right', label: 'Right eye' },
-            ],
-            profile.vision.redLensEye,
-            (v) => {
-              app.store.updateActive((p) => {
-                p.vision.redLensEye = v;
-              });
-              describe();
-            },
-          ),
-        ),
+        eyes?.glasses,
+        eyes?.redLens,
         setting(
           'The weaker eye is the',
           'The eye your eye doctor is helping. If you are not sure, ask them.',
@@ -174,7 +109,7 @@ export const settingsScreen: Screen = (app) =>
               });
               describe();
             },
-          ),
+          ).el,
         ),
         summary,
       ),
@@ -258,7 +193,7 @@ export const settingsScreen: Screen = (app) =>
               app.store.updateActive((p) => {
                 p.vision.background = v;
               }),
-          ),
+          ).el,
         ),
       ),
       h('div', { class: 'row' }, link('Players', '#/profiles', 'btn btn-plain'), link('For grown-ups', '#/parent', 'btn btn-plain')),
