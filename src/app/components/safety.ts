@@ -55,6 +55,10 @@ export interface PauseMenuActions {
   onQuit(): void;
   /** "I see double / my eyes hurt". */
   onStop(): void;
+  /** Training tasks: end the block now and see the result. */
+  onEndNow?(): void;
+  /** A gentle line above the stop button for when the task is not working out. */
+  notWorkingNote?: string;
 }
 
 /** The pause menu of every game. The stop button is always here. */
@@ -67,9 +71,11 @@ export function pauseMenu(actions: PauseMenuActions): HTMLElement {
       'div',
       { class: 'stack' },
       button('Keep playing', actions.onResume, 'primary', { class: 'btn-big', 'data-testid': 'resume' }),
+      actions.onEndNow ? button('End this block now', actions.onEndNow, 'plain', { 'data-testid': 'end-now' }) : null,
       button('Adjust colours', actions.onAdjustColours, 'plain', { 'data-testid': 'adjust-colours' }),
       button('Start again', actions.onRestart),
       button('Stop and go home', actions.onQuit),
+      actions.notWorkingNote ? h('p', { class: 'small', 'data-testid': 'not-working-note' }, actions.notWorkingNote) : null,
       button('I see double / my eyes hurt', actions.onStop, 'warn', { 'data-testid': 'stop-double' }),
     ),
   );

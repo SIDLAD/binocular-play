@@ -1,6 +1,7 @@
-import { Staircase, type Game, type GameContext, type GameInput, type GameStatus, type Renderer, type SavedProgress } from '../../engine/api';
+import { Staircase, startBackOff, type Game, type GameContext, type GameInput, type GameStatus, type Renderer, type SavedProgress } from '../../engine/api';
 import {
   BLOCK_TRIALS,
+  MIN_FIND_TRIALS,
   CONTRAST_RULE,
   FEEDBACK_MS,
   FIND_CONTRAST,
@@ -46,15 +47,18 @@ export class StripeFinder implements Game {
   private maxCpd: number;
   private lastContrast = 1;
 
+  private readonly trials: number;
+
   constructor(private ctx: GameContext) {
     const s = ctx.saved ?? {};
+    this.trials = ctx.blockTrials ?? BLOCK_TRIALS;
     this.maxCpd = ctx.display.devicePxPerDegree / 4;
     this.blocks = typeof s.blocks === 'number' ? s.blocks : 0;
     this.finding = typeof s.cpd !== 'number';
     this.cpd = typeof s.cpd === 'number' ? Math.min(this.maxCpd, s.cpd) : START_CPD;
     this.stair = this.finding
-      ? new Staircase(PERIOD_RULE, Math.max(1 / this.maxCpd, 1 / START_CPD))
-      : new Staircase(CONTRAST_RULE, typeof s.contrast === 'number' ? Math.min(1, s.contrast * 1.3) : 0.8);
+      ? new Staircase(PERIOD_RULE, Math.max(1 / this.maxCpd, typeof s.period === 'number' ? s.period : 1 / START_CPD))
+      : new Staircase(CONTRAST_RULE, typeof s.contrast === 'number' ? Math.min(1, s.contrast * startBackOff(1.3, this.trials)) : 0.8);
     this.newTrial();
   }
 
@@ -126,7 +130,7 @@ export class StripeFinder implements Game {
       this.phase = 'answer';
       this.phaseMs = 0;
     } else if (this.phase === 'feedback' && this.phaseMs >= FEEDBACK_MS) {
-      if (this.done >= BLOCK_TRIALS) {
+      if (this.done >= this.trials) {
         this.endBlock();
         return;
       }
@@ -138,14 +142,21 @@ export class StripeFinder implements Game {
 
   private endBlock(): void {
     this.over = true;
-    this.blocks++;
+    if (this.done > 0) this.blocks++;
     if (this.finding) {
+      // Fewer than MIN_FIND_TRIALS answers: keep finding next time, from where this block got to.
+      if (this.done < MIN_FIND_TRIALS) return;
       this.cpd = trainingCpd(this.stair.estimate(), this.maxCpd);
       this.finding = false;
-    } else {
+    } else if (this.stair.settled(2)) {
+      // A one-step nudge, only once the contrast has turned round at least twice.
       this.cpd = adjustCpd(this.cpd, this.stair.estimate(), this.maxCpd);
     }
     this.ctx.sound('level');
+  }
+
+  endNow(): void {
+    if (!this.over) this.endBlock();
   }
 
   render(r: Renderer): void {
@@ -183,7 +194,7 @@ export class StripeFinder implements Game {
     };
     arrow(this.w * 0.25, -1);
     arrow(this.w * 0.75, 1);
-    r.text('both', `${this.done} / ${BLOCK_TRIALS}`, 12, 16, { size: 13, intensity: 0.7 });
+    r.text('both', `${this.done} / ${this.trials}`, 12, 16, { size: 13, intensity: 0.7 });
     if (this.finding) r.text('both', 'Finding your training level', this.w - 12, 16, { size: 13, intensity: 0.7, align: 'right' });
   }
 
@@ -195,12 +206,14 @@ export class StripeFinder implements Game {
       over: this.over,
       trials: { done: this.done, correct: this.correct },
       targetMet: this.done >= 10 ? accuracy >= 0.65 : undefined,
+      settled: this.stair.settled(),
     };
   }
 
   save(): SavedProgress {
     const out: SavedProgress = { blocks: this.blocks };
-    if (!this.finding || this.over) out.cpd = this.cpd;
+    if (!this.finding) out.cpd = this.cpd;
+    else if (this.over && this.done > 0) out.period = this.stair.value;
     if (!this.finding && this.blocks > 0 && this.stair.state.trials > 0) out.contrast = this.stair.estimate();
     return out;
   }

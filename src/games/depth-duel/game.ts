@@ -1,4 +1,4 @@
-import { Staircase, type Game, type GameContext, type GameInput, type GameStatus, type Renderer, type SavedProgress } from '../../engine/api';
+import { Staircase, startBackOff, type Game, type GameContext, type GameInput, type GameStatus, type Renderer, type SavedProgress } from '../../engine/api';
 import {
   BLOCK_TRIALS,
   DISPARITY_RULE,
@@ -45,11 +45,18 @@ export class DepthDuel implements Game {
   private w = 300;
   private h = 300;
   private over = false;
+  private readonly trials: number;
+  /** The disparity saved by the last block, kept when this block is too short to settle. */
+  private readonly savedDisparity: number | null;
+  private readonly backOff: number;
 
   constructor(private ctx: GameContext) {
     const s = ctx.saved ?? {};
+    this.trials = ctx.blockTrials ?? BLOCK_TRIALS;
     this.blocks = typeof s.blocks === 'number' ? s.blocks : 0;
-    this.stair = new Staircase(DISPARITY_RULE, typeof s.disparity === 'number' ? Math.min(DISPARITY_RULE.max, s.disparity * 1.5) : START_DISPARITY);
+    this.savedDisparity = typeof s.disparity === 'number' ? s.disparity : null;
+    this.backOff = startBackOff(1.5, this.trials);
+    this.stair = new Staircase(DISPARITY_RULE, this.savedDisparity !== null ? Math.min(DISPARITY_RULE.max, this.savedDisparity * this.backOff) : START_DISPARITY);
     this.patches = [this.newPatch(), this.newPatch()];
     this.newTrial();
   }
@@ -113,9 +120,8 @@ export class DepthDuel implements Game {
       this.phase = 'show';
       this.phaseMs = 0;
     } else if (this.phase === 'feedback' && this.phaseMs >= FEEDBACK_MS) {
-      if (this.done >= BLOCK_TRIALS) {
-        this.over = true;
-        this.blocks++;
+      if (this.done >= this.trials) {
+        this.finish();
         this.ctx.sound('level');
         return;
       }
@@ -123,6 +129,15 @@ export class DepthDuel implements Game {
       this.phase = 'show';
       this.phaseMs = 0;
     }
+  }
+
+  private finish(): void {
+    this.over = true;
+    if (this.done > 0) this.blocks++;
+  }
+
+  endNow(): void {
+    if (!this.over) this.finish();
   }
 
   private layout() {
@@ -169,7 +184,7 @@ export class DepthDuel implements Game {
     if (this.phase === 'feedback') {
       r.text('both', this.lastRight ? 'Yes!' : 'The other one', this.w - 12, cy, { align: 'right', size: 16, bold: true });
     }
-    r.text('both', `${this.done} / ${BLOCK_TRIALS}`, 12, 16, { size: 13, intensity: 0.7 });
+    r.text('both', `${this.done} / ${this.trials}`, 12, 16, { size: 13, intensity: 0.7 });
   }
 
   status(): GameStatus {
@@ -180,11 +195,20 @@ export class DepthDuel implements Game {
       over: this.over,
       trials: { done: this.done, correct: this.correct },
       targetMet: this.done >= 10 ? accuracy >= 0.6 : undefined,
+      settled: this.stair.settled(),
     };
   }
 
+  /**
+   * A block too short to settle moves the saved level only half way (in log steps) by what
+   * the answers changed (the warm-up back-off taken out), so a run of short blocks neither
+   * races ahead nor drifts easier. A block with no answers keeps it as it was.
+   */
   save(): SavedProgress {
-    return { blocks: this.blocks, disparity: this.stair.estimate() };
+    if (this.stair.settled() || this.savedDisparity === null) return { blocks: this.blocks, disparity: this.stair.estimate() };
+    const reached = this.stair.value / this.backOff;
+    const disparity = Math.max(DISPARITY_RULE.min, Math.min(DISPARITY_RULE.max, Math.sqrt(this.savedDisparity * reached)));
+    return { blocks: this.blocks, disparity };
   }
 
   dispose(): void {}

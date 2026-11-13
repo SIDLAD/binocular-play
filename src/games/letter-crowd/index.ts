@@ -14,6 +14,7 @@ export const letterCrowd: GameDefinition = {
   ],
   eyeMode: 'weakEyeOnly',
   group: 'training',
+  blockLengths: { choices: [10, 25, 50], default: 50 },
   usesVisualAngle: true,
   evidence: {
     badge: 'small',

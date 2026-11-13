@@ -104,6 +104,15 @@ function gameProgress(v: unknown): Record<string, Record<string, number>> {
   return out;
 }
 
+/** Whole numbers 1–500 per game id. Whether a value is one of the task's choices is checked at play time. */
+function blockTrials(v: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [game, val] of Object.entries(obj(v)).slice(0, MAX_GAMES)) {
+    if (typeof val === 'number' && Number.isFinite(val)) out[game.slice(0, 80)] = Math.round(num(val, 1, 1, 500));
+  }
+  return out;
+}
+
 function autoContrast(v: unknown): Profile['autoContrast'] {
   const o = obj(v);
   const balance = o.balanceMax;
@@ -185,6 +194,7 @@ export function sanitizeProfile(v: unknown): Profile | null {
     fellowContrast: num(o.fellowContrast, 1, MIN_CONTRAST, 1),
     autoContrast: autoContrast(o.autoContrast),
     gameProgress: gameProgress(o.gameProgress),
+    blockTrials: blockTrials(o.blockTrials),
     goal: {
       daysPerWeek: Math.round(num(obj(o.goal).daysPerWeek, 5, 1, 7)),
       minutesPerDay: Math.round(num(obj(o.goal).minutesPerDay, 20, 5, 120)),

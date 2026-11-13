@@ -14,6 +14,7 @@ export const stripeFinder: GameDefinition = {
   ],
   eyeMode: 'weakEyeOnly',
   group: 'training',
+  blockLengths: { choices: [10, 30, 60], default: 60 },
   usesVisualAngle: true,
   evidence: {
     badge: 'small',

@@ -65,4 +65,15 @@ describe('staircase', () => {
     expect(st.state.reversals).toEqual([4, 8]);
     expect(st.estimate()).toBeCloseTo(Math.sqrt(32));
   });
+
+  it('counts as settled only after enough reversals', () => {
+    const st = new Staircase({ down: 1, harder: 0.5, easier: 2, min: 0.001, max: 100 }, 8);
+    expect(st.settled()).toBe(false);
+    for (let i = 0; i < 4; i++) st.answer(i % 2 === 0);
+    expect(st.state.reversals.length).toBe(3);
+    expect(st.settled(2)).toBe(true);
+    expect(st.settled()).toBe(false);
+    st.answer(true);
+    expect(st.settled()).toBe(true);
+  });
 });

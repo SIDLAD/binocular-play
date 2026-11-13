@@ -44,4 +44,30 @@ describe('Stripe Finder rules', () => {
     playBlock(next, () => 'right');
     expect(next.save().contrast).toBeGreaterThan(0);
   });
+
+  it('a block lasts as many answers as picked', () => {
+    const g = new StripeFinder(testGameContext({ mode: 'weak', blockTrials: 10 }));
+    playBlock(g, () => 'left');
+    expect(g.status().trials?.done).toBe(10);
+    expect(g.save().cpd).toBeGreaterThan(0);
+  });
+
+  it('a finding block ended very early keeps finding next time, from where it got to', () => {
+    const g = new StripeFinder(testGameContext({ mode: 'weak' }));
+    g.resize(400, 700);
+    // Answer three trials, then end from the pause menu.
+    let guard = 0;
+    while ((g.status().trials?.done ?? 0) < 3 && guard++ < 100_000) {
+      g.update(100);
+      g.input({ kind: 'action', action: 'left', pressed: true });
+    }
+    g.endNow();
+    expect(g.status().over).toBe(true);
+    const saved = g.save();
+    expect(saved.cpd).toBeUndefined();
+    expect(saved.period).toBeGreaterThan(0);
+    expect(saved.blocks).toBe(1);
+    const next = new StripeFinder(testGameContext({ mode: 'weak', saved }));
+    expect(next.status().level).toBe(1); // still finding
+  });
 });

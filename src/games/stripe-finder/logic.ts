@@ -19,6 +19,8 @@ export const START_CPD = 1.5;
 export const PATCH_DEG = 3;
 export const TILT = Math.PI / 4;
 export const BLOCK_TRIALS = 60;
+/** The first (finding) block picks the stripe size only after this many answers. */
+export const MIN_FIND_TRIALS = 10;
 export const FIXATION_MS = 500;
 export const SHOW_MS = 400;
 export const FEEDBACK_MS = 400;

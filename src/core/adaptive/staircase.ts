@@ -29,6 +29,8 @@ export interface StaircaseState {
 }
 
 const MAX_REVERSALS = 40;
+/** Reversals before a block's level counts as settled (short blocks may not get there). */
+export const SETTLED_REVERSALS = 4;
 
 export class Staircase {
   readonly rule: StaircaseRule;
@@ -73,6 +75,11 @@ export class Staircase {
       s.value = clamp(s.value * (dir < 0 ? r.harder : r.easier), r.min, r.max);
     }
     return s.value;
+  }
+
+  /** True once there are enough reversals for estimate() to mean something. */
+  settled(n = SETTLED_REVERSALS): boolean {
+    return this.s.reversals.length >= n;
   }
 
   /**

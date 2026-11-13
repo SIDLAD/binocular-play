@@ -15,6 +15,9 @@ export const depthDuel: GameDefinition = {
   group: 'training',
   requiresNoEyeTurn: true,
   usesVisualAngle: true,
+  blockLengths: { choices: [5, 10, 20, 40], default: 40 },
+  notWorkingNote:
+    'If the squares never look nearer or farther, that is all right: depth does not show up for everyone, and it may change over time. Pick a shorter block, play something else, and tell your eye doctor or orthoptist next time. If anything looks double or your eyes hurt, stop and press “I see double / my eyes hurt”.',
   evidence: {
     badge: 'small',
     note: 'Copies red-green anaglyph depth training (Xi 2014): in a small study of adults, depth perception improved a lot and acuity a little. A VR version (Vedamurthy 2016) found similar depth gains. Not offered to anyone who reported an eye turn or double vision.',
